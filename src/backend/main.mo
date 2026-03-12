@@ -8,8 +8,6 @@ import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 
 actor {
-  // Migration: keep accessControlState so the upgrade doesn't fail due to
-  // a stable variable being implicitly discarded. It is no longer used.
   let accessControlState = AccessControl.initState();
 
   include MixinStorage();
@@ -30,7 +28,7 @@ actor {
     price : Nat;
   };
 
-  type Order = {
+  type CustomerOrder = {
     id : Nat;
     customerName : Text;
     customerPhone : Text;
@@ -42,6 +40,13 @@ actor {
     createdAt : Int;
   };
 
+  type Feedback = {
+    id : Nat;
+    customerName : Text;
+    message : Text;
+    createdAt : Int;
+  };
+
   module Product {
     public func compare(p1 : Product, p2 : Product) : Order.Order {
       Nat.compare(p1.id, p2.id);
@@ -49,10 +54,12 @@ actor {
   };
 
   let products = Map.empty<Nat, Product>();
-  let orders = Map.empty<Nat, Order>();
+  let orders = Map.empty<Nat, CustomerOrder>();
+  let feedbacks = Map.empty<Nat, Feedback>();
 
   var nextProductId = 1;
   var nextOrderId = 1;
+  var nextFeedbackId = 1;
 
   var deliveryTiming : Text = "10am - 6pm";
   var discount : Text = "";
@@ -110,7 +117,7 @@ actor {
   // Orders
   public shared func placeOrder(customerName : Text, customerPhone : Text, customerAddress : Text, paymentMethod : Text, items : [OrderItem]) : async Nat {
     let totalAmount = items.values().foldLeft(0, func(acc, item) { acc + item.price * item.quantity });
-    let order : Order = {
+    let order : CustomerOrder = {
       id = nextOrderId;
       customerName;
       customerPhone;
@@ -126,7 +133,7 @@ actor {
     order.id;
   };
 
-  public query func getOrders() : async [Order] {
+  public query func getOrders() : async [CustomerOrder] {
     orders.values().toArray();
   };
 
@@ -134,7 +141,7 @@ actor {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order does not exist") };
       case (?order) {
-        let updatedOrder : Order = {
+        let updatedOrder : CustomerOrder = {
           id = order.id;
           customerName = order.customerName;
           customerPhone = order.customerPhone;
@@ -147,6 +154,13 @@ actor {
         };
         orders.add(orderId, updatedOrder);
       };
+    };
+  };
+
+  public shared func deleteOrder(orderId : Nat) : async () {
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order does not exist") };
+      case (?_) { orders.remove(orderId) };
     };
   };
 
@@ -164,5 +178,22 @@ actor {
 
   public shared func setDiscount(discountText : Text) : async () {
     discount := discountText;
+  };
+
+  // Feedback
+  public shared func submitFeedback(customerName : Text, message : Text) : async Nat {
+    let feedback : Feedback = {
+      id = nextFeedbackId;
+      customerName;
+      message;
+      createdAt = Time.now();
+    };
+    feedbacks.add(nextFeedbackId, feedback);
+    nextFeedbackId += 1;
+    feedback.id;
+  };
+
+  public query func getFeedbacks() : async [Feedback] {
+    feedbacks.values().toArray();
   };
 };

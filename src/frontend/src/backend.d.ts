@@ -23,9 +23,16 @@ export interface Product {
     imageId: string;
     price: bigint;
 }
+export interface Feedback {
+    id: bigint;
+    customerName: string;
+    message: string;
+    createdAt: bigint;
+}
 export interface backendInterface {
     addProduct(name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<bigint>;
     deleteProduct(id: bigint): Promise<void>;
+    deleteOrder(orderId: bigint): Promise<void>;
     getDeliveryTiming(): Promise<string>;
     getDiscount(): Promise<string>;
     getOrders(): Promise<Array<Order>>;
@@ -36,4 +43,6 @@ export interface backendInterface {
     setDiscount(discountText: string): Promise<void>;
     updateOrderStatus(orderId: bigint, status: string): Promise<void>;
     updateProduct(id: bigint, name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<void>;
+    submitFeedback(customerName: string, message: string): Promise<bigint>;
+    getFeedbacks(): Promise<Array<Feedback>>;
 }

@@ -30,6 +30,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  CalendarDays,
   ClipboardList,
   Clock,
   Eye,
@@ -37,6 +38,7 @@ import {
   Leaf,
   Loader2,
   Lock,
+  MessageSquare,
   Package,
   Pencil,
   Plus,
@@ -49,9 +51,11 @@ import { toast } from "sonner";
 import type { Order, Product } from "../backend";
 import {
   useAddProduct,
+  useDeleteOrder,
   useDeleteProduct,
   useDeliveryTiming,
   useDiscount,
+  useFeedbacks,
   useOrders,
   useProducts,
   useSetDeliveryTiming,
@@ -76,7 +80,6 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
       setError("Incorrect password. Please try again.");
       return;
     }
-    // Persist across sessions and devices
     localStorage.setItem(ADMIN_LS_KEY, "true");
     onSuccess();
   };
@@ -515,9 +518,34 @@ function ProductsTab() {
 
 // ─── Orders Tab ─────────────────────────────────────────────────────────────
 
-function OrdersTab() {
-  const { data: orders, isLoading } = useOrders();
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatOrderDate(ts: bigint) {
+  const ms = Number(ts / 1_000_000n);
+  return new Date(ms).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function OrderCard({
+  order,
+  idx,
+  showDate,
+}: {
+  order: Order;
+  idx: number;
+  showDate?: boolean;
+}) {
   const updateStatus = useUpdateOrderStatus();
+  const deleteOrder = useDeleteOrder();
 
   const statusColors: Record<string, string> = {
     pending: "bg-accent/20 text-accent-foreground",
@@ -525,104 +553,272 @@ function OrdersTab() {
     delivered: "bg-secondary text-secondary-foreground",
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteOrder.mutateAsync(order.id);
+      toast.success("Order deleted.");
+    } catch {
+      toast.error("Failed to delete order.");
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <h3 className="font-display font-bold text-lg text-foreground">Orders</h3>
-      {isLoading ? (
+    <div
+      data-ocid={`admin.order.item.${idx + 1}`}
+      className="bg-card rounded-lg shadow-card p-4 space-y-3"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold text-sm text-card-foreground">
+            {order.customerName}
+          </p>
+          <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {order.customerAddress}
+          </p>
+          {showDate && (
+            <div className="flex items-center gap-1 mt-1">
+              <CalendarDays className="w-3 h-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground font-medium">
+                {formatOrderDate(order.createdAt)}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className="font-bold text-sm text-primary">
+            ₹{order.totalAmount.toString()}
+          </span>
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              statusColors[order.status] ?? "bg-muted text-muted-foreground"
+            }`}
+          >
+            {order.status}
+          </span>
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-2 space-y-1">
+        {order.items.map((item, iIdx) => (
+          <div
+            key={`${item.productId.toString()}-${iIdx}`}
+            className="flex justify-between text-xs text-muted-foreground"
+          >
+            <span>
+              {item.productName} × {item.quantity.toString()}
+            </span>
+            <span>₹{(item.price * item.quantity).toString()}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {order.paymentMethod}
+        </span>
+        <div className="flex items-center gap-2">
+          {order.status === "delivered" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  data-ocid={`admin.order.delete_button.${idx + 1}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this delivered order from{" "}
+                    <strong>{order.customerName}</strong>? This cannot be
+                    undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-ocid="admin.order.cancel_button">
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    data-ocid="admin.order.confirm_button"
+                  >
+                    {deleteOrder.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Delete"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <Select
+            value={order.status}
+            onValueChange={async (v) => {
+              try {
+                await updateStatus.mutateAsync({
+                  orderId: order.id,
+                  status: v,
+                });
+                toast.success("Status updated.");
+              } catch {
+                toast.error("Failed to update status.");
+              }
+            }}
+          >
+            <SelectTrigger
+              className="w-36 h-8 text-xs"
+              data-ocid={`admin.order.select.${idx + 1}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2 pt-2">
+      <span className="text-xs font-bold text-primary uppercase tracking-wider">
+        {label}
+      </span>
+      <span className="text-xs bg-primary/10 text-primary font-semibold rounded-full px-2 py-0.5">
+        {count}
+      </span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+function OrdersTab() {
+  const { data: orders, isLoading } = useOrders();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <h3 className="font-display font-bold text-lg text-foreground">
+          Orders
+        </h3>
         <div data-ocid="admin.order.loading_state" className="space-y-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={`sk-${i}`} className="h-28 w-full rounded-lg" />
           ))}
         </div>
-      ) : !orders?.length ? (
+      </div>
+    );
+  }
+
+  if (!orders?.length) {
+    return (
+      <div className="space-y-4">
+        <h3 className="font-display font-bold text-lg text-foreground">
+          Orders
+        </h3>
         <div data-ocid="admin.order.empty_state" className="text-center py-12">
           <ClipboardList className="w-10 h-10 text-primary/30 mx-auto mb-3" />
           <p className="text-muted-foreground text-sm">No orders yet.</p>
         </div>
-      ) : (
-        <div data-ocid="admin.order.list" className="space-y-3">
-          {orders.map((order: Order, idx: number) => (
-            <div
-              key={order.id.toString()}
-              data-ocid={`admin.order.item.${idx + 1}`}
-              className="bg-card rounded-lg shadow-card p-4 space-y-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-sm text-card-foreground">
-                    {order.customerName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {order.customerPhone}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {order.customerAddress}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="font-bold text-sm text-primary">
-                    ₹{order.totalAmount.toString()}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      statusColors[order.status] ??
-                      "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </div>
-              </div>
+      </div>
+    );
+  }
 
-              <div className="border-t border-border pt-2 space-y-1">
-                {order.items.map((item, iIdx) => (
-                  <div
-                    key={`${item.productId.toString()}-${iIdx}`}
-                    className="flex justify-between text-xs text-muted-foreground"
-                  >
-                    <span>
-                      {item.productName} × {item.quantity.toString()}
-                    </span>
-                    <span>₹{(item.price * item.quantity).toString()}</span>
-                  </div>
-                ))}
-              </div>
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
 
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {order.paymentMethod}
-                </span>
-                <Select
-                  value={order.status}
-                  onValueChange={async (v) => {
-                    try {
-                      await updateStatus.mutateAsync({
-                        orderId: order.id,
-                        status: v,
-                      });
-                      toast.success("Status updated.");
-                    } catch {
-                      toast.error("Failed to update status.");
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    className="w-36 h-8 text-xs"
-                    data-ocid={`admin.order.select.${idx + 1}`}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  const todayOrders: Order[] = [];
+  const yesterdayOrders: Order[] = [];
+  const pastOrders: Order[] = [];
+
+  for (const order of orders) {
+    const orderDate = new Date(Number(order.createdAt / 1_000_000n));
+    if (isSameDay(orderDate, now)) {
+      todayOrders.push(order);
+    } else if (isSameDay(orderDate, yesterday)) {
+      yesterdayOrders.push(order);
+    } else {
+      pastOrders.push(order);
+    }
+  }
+
+  // Sort each group newest-first
+  const sortDesc = (a: Order, b: Order) =>
+    Number(
+      b.createdAt - a.createdAt > 0n
+        ? 1n
+        : b.createdAt - a.createdAt < 0n
+          ? -1n
+          : 0n,
+    );
+
+  todayOrders.sort(sortDesc);
+  yesterdayOrders.sort(sortDesc);
+  pastOrders.sort(sortDesc);
+
+  // Build a flat list for deterministic idx
+  const allGrouped = [...todayOrders, ...yesterdayOrders, ...pastOrders];
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-display font-bold text-lg text-foreground">Orders</h3>
+
+      <div data-ocid="admin.order.list" className="space-y-3">
+        {todayOrders.length > 0 && (
+          <>
+            <SectionHeader label="Today" count={todayOrders.length} />
+            {todayOrders.map((order) => (
+              <OrderCard
+                key={order.id.toString()}
+                order={order}
+                idx={allGrouped.indexOf(order)}
+                showDate={false}
+              />
+            ))}
+          </>
+        )}
+
+        {yesterdayOrders.length > 0 && (
+          <>
+            <SectionHeader label="Yesterday" count={yesterdayOrders.length} />
+            {yesterdayOrders.map((order) => (
+              <OrderCard
+                key={order.id.toString()}
+                order={order}
+                idx={allGrouped.indexOf(order)}
+                showDate={false}
+              />
+            ))}
+          </>
+        )}
+
+        {pastOrders.length > 0 && (
+          <>
+            <SectionHeader label="Past Orders" count={pastOrders.length} />
+            {pastOrders.map((order) => (
+              <OrderCard
+                key={order.id.toString()}
+                order={order}
+                idx={allGrouped.indexOf(order)}
+                showDate={true}
+              />
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -634,7 +830,6 @@ function DeliveryTimingTab() {
   const [timing, setTiming] = useState("");
   const setDelivery = useSetDeliveryTiming();
 
-  // Sync with fetched data
   useState(() => {
     if (current !== undefined) setTiming(current);
   });
@@ -708,7 +903,6 @@ function DiscountTab() {
   const [minOrder, setMinOrder] = useState("");
   const setDiscountMutation = useSetDiscount();
 
-  // Populate from current backend value when loaded
   const parsed = parseDiscount(current ?? "");
   const effectivePct = pct || (parsed ? String(parsed.pct) : "");
   const effectiveMin = minOrder || (parsed ? String(parsed.minOrder) : "");
@@ -791,6 +985,69 @@ function DiscountTab() {
   );
 }
 
+// ─── Feedback Tab ────────────────────────────────────────────────────────────
+
+function FeedbackTab() {
+  const { data: feedbacks, isLoading } = useFeedbacks();
+
+  const formatDate = (ts: bigint) => {
+    // ts is nanoseconds from IC
+    const ms = Number(ts / 1_000_000n);
+    return new Date(ms).toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-display font-bold text-lg text-foreground">
+        Customer Feedback
+      </h3>
+      {isLoading ? (
+        <div data-ocid="admin.feedback.loading_state" className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={`sk-${i}`} className="h-20 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : !feedbacks?.length ? (
+        <div
+          data-ocid="admin.feedback.empty_state"
+          className="text-center py-12"
+        >
+          <MessageSquare className="w-10 h-10 text-primary/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">
+            No feedback received yet.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {feedbacks.map((fb, idx) => (
+            <div
+              key={fb.id.toString()}
+              data-ocid={`admin.feedback.item.${idx + 1}`}
+              className="bg-card rounded-lg shadow-card p-4 space-y-1.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-sm text-card-foreground">
+                  {fb.customerName}
+                </p>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(fb.createdAt)}
+                </span>
+              </div>
+              <p className="text-sm text-foreground">{fb.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Panel (authenticated) ────────────────────────────────────────────
 
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
@@ -816,7 +1073,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <Tabs defaultValue="products" className="flex-1">
-        <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-border bg-muted/50 h-auto p-0">
+        <TabsList className="grid grid-cols-5 w-full rounded-none border-b border-border bg-muted/50 h-auto p-0">
           <TabsTrigger
             value="products"
             className="flex flex-col gap-0.5 py-2.5 rounded-none data-[state=active]:bg-card data-[state=active]:shadow-none"
@@ -849,6 +1106,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <Tag className="w-4 h-4" />
             <span className="text-[10px] font-semibold">Discount</span>
           </TabsTrigger>
+          <TabsTrigger
+            value="feedback"
+            className="flex flex-col gap-0.5 py-2.5 rounded-none data-[state=active]:bg-card data-[state=active]:shadow-none"
+            data-ocid="admin.feedback.tab"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span className="text-[10px] font-semibold">Feedback</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="p-4 mt-0">
@@ -863,6 +1128,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         <TabsContent value="discount" className="p-4 mt-0">
           <DiscountTab />
         </TabsContent>
+        <TabsContent value="feedback" className="p-4 mt-0">
+          <FeedbackTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -871,7 +1139,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 // ─── Main AdminPage ─────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  // Check localStorage on first render — persists across page reloads and devices
   const [authenticated, setAuthenticated] = useState(
     () => localStorage.getItem(ADMIN_LS_KEY) === "true",
   );

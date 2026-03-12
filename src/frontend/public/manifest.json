@@ -1,0 +1,21 @@
+{
+  "name": "Brinjal Fresh",
+  "short_name": "Brinjal",
+  "description": "Fresh vegetables delivered to your door",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#84cc16",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/assets/uploads/file_0000000059c071faa5c5676b159da8c7-1--1.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/uploads/file_0000000059c071faa5c5676b159da8c7-1--1.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

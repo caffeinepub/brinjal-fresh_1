@@ -2,6 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Order, Product } from "../backend";
 import { useActor } from "./useActor";
 
+// Feedback type (available after backend deployment)
+export interface Feedback {
+  id: bigint;
+  customerName: string;
+  message: string;
+  createdAt: bigint;
+}
+
 export function useProducts() {
   const { actor, isFetching } = useActor();
   return useQuery<Product[]>({
@@ -51,6 +59,20 @@ export function useOrders() {
     queryFn: async () => {
       if (!actor) return [];
       return actor.getOrders();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useFeedbacks() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Feedback[]>({
+    queryKey: ["feedbacks"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const a = actor as any;
+      if (typeof a.getFeedbacks !== "function") return [];
+      return a.getFeedbacks();
     },
     enabled: !!actor && !isFetching,
   });
@@ -172,6 +194,23 @@ export function useUpdateOrderStatus() {
   });
 }
 
+export function useDeleteOrder() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      const a = actor as any;
+      if (typeof a.deleteOrder !== "function")
+        throw new Error("deleteOrder not available");
+      return a.deleteOrder(orderId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+    },
+  });
+}
+
 export function useSetDeliveryTiming() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -196,6 +235,24 @@ export function useSetDiscount() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["discount"] });
+    },
+  });
+}
+
+export function useSubmitFeedback() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { customerName: string; message: string }) => {
+      if (!actor) throw new Error("Not connected");
+      const a = actor as any;
+      if (typeof a.submitFeedback !== "function") {
+        throw new Error("submitFeedback not available yet");
+      }
+      return a.submitFeedback(params.customerName, params.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["feedbacks"] });
     },
   });
 }
