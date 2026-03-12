@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/assets/fonts/CabinetGrotesk-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/assets/fonts/PlusJakartaSans-Variable.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  font-style: normal;
+}
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* === Brinjal.fresh Lime Green Theme === */
+    --background: 0.88 0.15 140;
+    --foreground: 0.18 0.06 145;
+
+    --card: 1 0 0;
+    --card-foreground: 0.18 0.06 145;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.18 0.06 145;
+
+    /* Deep forest green for primary buttons */
+    --primary: 0.38 0.13 148;
+    --primary-foreground: 0.97 0 0;
+
+    /* Light lime for secondary */
+    --secondary: 0.93 0.08 135;
+    --secondary-foreground: 0.25 0.08 145;
+
+    /* Muted lime tints */
+    --muted: 0.91 0.08 136;
+    --muted-foreground: 0.44 0.08 140;
+
+    /* Golden/amber accent for banners */
+    --accent: 0.80 0.18 88;
+    --accent-foreground: 0.18 0.05 90;
+
+    --destructive: 0.58 0.24 27;
+    --destructive-foreground: 0.97 0 0;
+
+    --border: 0.78 0.11 138;
+    --input: 0.92 0.07 135;
+    --ring: 0.38 0.13 148;
+
+    --chart-1: 0.38 0.13 148;
+    --chart-2: 0.80 0.18 88;
+    --chart-3: 0.60 0.20 148;
+    --chart-4: 0.55 0.15 30;
+    --chart-5: 0.70 0.16 200;
+
+    --sidebar: 0.30 0.10 148;
+    --sidebar-foreground: 0.97 0 0;
+    --sidebar-primary: 0.80 0.22 135;
+    --sidebar-primary-foreground: 0.18 0.06 145;
+    --sidebar-accent: 0.40 0.12 148;
+    --sidebar-accent-foreground: 0.97 0 0;
+    --sidebar-border: 0.35 0.10 148;
+    --sidebar-ring: 0.60 0.15 148;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cabinet Grotesk', sans-serif;
+  }
+}
+
+@layer utilities {
+  .bottom-safe {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  
+  .card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px oklch(0.18 0.06 145 / 0.18);
+  }
+}
