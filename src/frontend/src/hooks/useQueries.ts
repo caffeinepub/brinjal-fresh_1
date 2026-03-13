@@ -1,14 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Order, Product } from "../backend";
+import type { Feedback, Order, Product } from "../backend";
 import { useActor } from "./useActor";
 
-// Feedback type (available after backend deployment)
-export interface Feedback {
-  id: bigint;
-  customerName: string;
-  message: string;
-  createdAt: bigint;
-}
+export type { Feedback };
 
 export function useProducts() {
   const { actor, isFetching } = useActor();
@@ -70,9 +64,7 @@ export function useFeedbacks() {
     queryKey: ["feedbacks"],
     queryFn: async () => {
       if (!actor) return [];
-      const a = actor as any;
-      if (typeof a.getFeedbacks !== "function") return [];
-      return a.getFeedbacks();
+      return actor.getFeedbacks();
     },
     enabled: !!actor && !isFetching,
   });
@@ -200,10 +192,7 @@ export function useDeleteOrder() {
   return useMutation({
     mutationFn: async (orderId: bigint) => {
       if (!actor) throw new Error("Not connected");
-      const a = actor as any;
-      if (typeof a.deleteOrder !== "function")
-        throw new Error("deleteOrder not available");
-      return a.deleteOrder(orderId);
+      return actor.deleteOrder(orderId);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -245,11 +234,7 @@ export function useSubmitFeedback() {
   return useMutation({
     mutationFn: async (params: { customerName: string; message: string }) => {
       if (!actor) throw new Error("Not connected");
-      const a = actor as any;
-      if (typeof a.submitFeedback !== "function") {
-        throw new Error("submitFeedback not available yet");
-      }
-      return a.submitFeedback(params.customerName, params.message);
+      return actor.submitFeedback(params.customerName, params.message);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["feedbacks"] });

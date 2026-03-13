@@ -121,6 +121,13 @@ export interface Product {
     imageId: string;
     price: bigint;
 }
+export interface Feedback {
+    id: bigint;
+    customerName: string;
+    message: string;
+    createdAt: bigint;
+}
+
 export interface _CaffeineStorageRefillResult {
     success?: boolean;
     topped_up_amount?: bigint;
@@ -153,6 +160,9 @@ export interface backendInterface {
     setDiscount(discountText: string): Promise<void>;
     updateOrderStatus(orderId: bigint, status: string): Promise<void>;
     updateProduct(id: bigint, name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<void>;
+    deleteOrder(orderId: bigint): Promise<void>;
+    submitFeedback(customerName: string, message: string): Promise<bigint>;
+    getFeedbacks(): Promise<Array<Feedback>>;
 }
 import type { UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -462,6 +472,48 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateProduct(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+    }
+        }
+    async deleteOrder(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteOrder(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteOrder(arg0);
+            return result;
+        }
+    }
+    async submitFeedback(arg0: string, arg1: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.submitFeedback(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.submitFeedback(arg0, arg1);
+            return result;
+        }
+    }
+    async getFeedbacks(): Promise<Array<Feedback>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getFeedbacks();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getFeedbacks();
             return result;
         }
     }

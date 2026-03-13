@@ -38,7 +38,6 @@ import {
   Leaf,
   Loader2,
   Lock,
-  MessageSquare,
   Package,
   Pencil,
   Plus,
@@ -55,7 +54,6 @@ import {
   useDeleteProduct,
   useDeliveryTiming,
   useDiscount,
-  useFeedbacks,
   useOrders,
   useProducts,
   useSetDeliveryTiming,
@@ -755,7 +753,6 @@ function OrdersTab() {
     }
   }
 
-  // Sort each group newest-first
   const sortDesc = (a: Order, b: Order) =>
     Number(
       b.createdAt - a.createdAt > 0n
@@ -769,7 +766,6 @@ function OrdersTab() {
   yesterdayOrders.sort(sortDesc);
   pastOrders.sort(sortDesc);
 
-  // Build a flat list for deterministic idx
   const allGrouped = [...todayOrders, ...yesterdayOrders, ...pastOrders];
 
   return (
@@ -985,69 +981,6 @@ function DiscountTab() {
   );
 }
 
-// ─── Feedback Tab ────────────────────────────────────────────────────────────
-
-function FeedbackTab() {
-  const { data: feedbacks, isLoading } = useFeedbacks();
-
-  const formatDate = (ts: bigint) => {
-    // ts is nanoseconds from IC
-    const ms = Number(ts / 1_000_000n);
-    return new Date(ms).toLocaleString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  return (
-    <div className="space-y-4">
-      <h3 className="font-display font-bold text-lg text-foreground">
-        Customer Feedback
-      </h3>
-      {isLoading ? (
-        <div data-ocid="admin.feedback.loading_state" className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={`sk-${i}`} className="h-20 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : !feedbacks?.length ? (
-        <div
-          data-ocid="admin.feedback.empty_state"
-          className="text-center py-12"
-        >
-          <MessageSquare className="w-10 h-10 text-primary/30 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">
-            No feedback received yet.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {feedbacks.map((fb, idx) => (
-            <div
-              key={fb.id.toString()}
-              data-ocid={`admin.feedback.item.${idx + 1}`}
-              className="bg-card rounded-lg shadow-card p-4 space-y-1.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-bold text-sm text-card-foreground">
-                  {fb.customerName}
-                </p>
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(fb.createdAt)}
-                </span>
-              </div>
-              <p className="text-sm text-foreground">{fb.message}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Admin Panel (authenticated) ────────────────────────────────────────────
 
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
@@ -1073,7 +1006,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <Tabs defaultValue="products" className="flex-1">
-        <TabsList className="grid grid-cols-5 w-full rounded-none border-b border-border bg-muted/50 h-auto p-0">
+        <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-border bg-muted/50 h-auto p-0">
           <TabsTrigger
             value="products"
             className="flex flex-col gap-0.5 py-2.5 rounded-none data-[state=active]:bg-card data-[state=active]:shadow-none"
@@ -1106,14 +1039,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <Tag className="w-4 h-4" />
             <span className="text-[10px] font-semibold">Discount</span>
           </TabsTrigger>
-          <TabsTrigger
-            value="feedback"
-            className="flex flex-col gap-0.5 py-2.5 rounded-none data-[state=active]:bg-card data-[state=active]:shadow-none"
-            data-ocid="admin.feedback.tab"
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span className="text-[10px] font-semibold">Feedback</span>
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="p-4 mt-0">
@@ -1127,9 +1052,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         </TabsContent>
         <TabsContent value="discount" className="p-4 mt-0">
           <DiscountTab />
-        </TabsContent>
-        <TabsContent value="feedback" className="p-4 mt-0">
-          <FeedbackTab />
         </TabsContent>
       </Tabs>
     </div>
