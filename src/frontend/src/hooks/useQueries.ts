@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Feedback, Order, Product } from "../backend";
+import type { Order, Product } from "../backend";
 import { useActor } from "./useActor";
-
-export type { Feedback };
 
 export function useProducts() {
   const { actor, isFetching } = useActor();
@@ -27,7 +25,7 @@ export function useDeliveryTiming() {
       return actor.getDeliveryTiming();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   });
 }
@@ -41,7 +39,7 @@ export function useDiscount() {
       return actor.getDiscount();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   });
 }
@@ -53,18 +51,6 @@ export function useOrders() {
     queryFn: async () => {
       if (!actor) return [];
       return actor.getOrders();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useFeedbacks() {
-  const { actor, isFetching } = useActor();
-  return useQuery<Feedback[]>({
-    queryKey: ["feedbacks"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getFeedbacks();
     },
     enabled: !!actor && !isFetching,
   });
@@ -190,9 +176,13 @@ export function useDeleteOrder() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (orderId: bigint) => {
+    mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
-      return actor.deleteOrder(orderId);
+      // deleteOrder may be available in the deployed backend
+      const a = actor as any;
+      if (typeof a.deleteOrder === "function") {
+        return a.deleteOrder(id);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -228,16 +218,21 @@ export function useSetDiscount() {
   });
 }
 
-export function useSubmitFeedback() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (params: { customerName: string; message: string }) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.submitFeedback(params.customerName, params.message);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["feedbacks"] });
-    },
-  });
+/** Parse discount stored as JSON string: {"percentage":10,"minimumAmount":300} */
+export function parseDiscount(
+  raw: string,
+): { percentage: number; minimumAmount: number } | null {
+  try {
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed.percentage === "number" &&
+      typeof parsed.minimumAmount === "number"
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

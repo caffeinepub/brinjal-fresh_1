@@ -32,17 +32,16 @@ export interface Feedback {
 export interface backendInterface {
     addProduct(name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<bigint>;
     deleteProduct(id: bigint): Promise<void>;
-    deleteOrder(orderId: bigint): Promise<void>;
     getDeliveryTiming(): Promise<string>;
     getDiscount(): Promise<string>;
-    getFeedbacks(): Promise<Array<Feedback>>;
     getOrders(): Promise<Array<Order>>;
     getProduct(id: bigint): Promise<Product>;
     getProducts(): Promise<Array<Product>>;
     placeOrder(customerName: string, customerPhone: string, customerAddress: string, paymentMethod: string, items: Array<OrderItem>): Promise<bigint>;
     setDeliveryTiming(timing: string): Promise<void>;
     setDiscount(discountText: string): Promise<void>;
-    submitFeedback(customerName: string, message: string): Promise<bigint>;
     updateOrderStatus(orderId: bigint, status: string): Promise<void>;
     updateProduct(id: bigint, name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<void>;
+    submitFeedback(customerName: string, message: string): Promise<bigint>;
+    getFeedbacks(): Promise<Array<Feedback>>;
 }

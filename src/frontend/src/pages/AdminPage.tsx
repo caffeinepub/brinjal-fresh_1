@@ -9,8 +9,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,19 +26,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Clock,
+  Eye,
+  EyeOff,
   Loader2,
   Lock,
   Package,
   Pencil,
-  ShoppingBag,
+  Plus,
+  Tag,
   Trash2,
+  Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Order, Product } from "../backend";
 import {
+  parseDiscount,
   useAddProduct,
   useDeleteOrder,
   useDeleteProduct,
@@ -45,135 +58,594 @@ import {
   useUpdateOrderStatus,
   useUpdateProduct,
 } from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 
 const ADMIN_PASSWORD = "adita96319";
-const ADMIN_KEY = "brinjal_admin";
 
-function groupOrders(orders: Order[]) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+type UnitType = "kg" | "piece" | "bundle" | "packet";
 
-  const todayOrders: Order[] = [];
-  const yesterdayOrders: Order[] = [];
-  const pastGroups: Record<string, Order[]> = {};
+const UNIT_LABELS: Record<UnitType, string> = {
+  kg: "Weight (kg)",
+  piece: "By Piece",
+  bundle: "By Bundle",
+  packet: "By Packet",
+};
 
-  for (const order of orders) {
-    const d = new Date(Number(order.createdAt) / 1_000_000);
-    d.setHours(0, 0, 0, 0);
-    if (d.getTime() === today.getTime()) {
-      todayOrders.push(order);
-    } else if (d.getTime() === yesterday.getTime()) {
-      yesterdayOrders.push(order);
-    } else {
-      const key = d.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-      if (!pastGroups[key]) pastGroups[key] = [];
-      pastGroups[key].push(order);
+const PRICE_LABELS: Record<UnitType, string> = {
+  kg: "Price per kg (₹)",
+  piece: "Price per piece (₹)",
+  bundle: "Price per bundle (₹)",
+  packet: "Price per packet (₹)",
+};
+
+// ─── Password Gate ────────────────────────────────────────────────────────────
+function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
+  const [pwd, setPwd] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = () => {
+    if (pwd !== ADMIN_PASSWORD) {
+      setError("Incorrect password.");
+      return;
     }
+    onSuccess();
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-6 gap-6">
+      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+        <Lock className="w-8 h-8 text-primary" />
+      </div>
+      <div className="text-center">
+        <h2 className="font-display text-xl font-bold text-foreground">
+          Admin Panel
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Enter password to access.
+        </p>
+      </div>
+      <div className="w-full max-w-xs space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="admin-pwd" className="text-xs font-semibold">
+            Password
+          </Label>
+          <div className="relative">
+            <Input
+              id="admin-pwd"
+              data-ocid="admin.input"
+              type={showPwd ? "text" : "password"}
+              placeholder="Enter admin password"
+              value={pwd}
+              onChange={(e) => {
+                setPwd(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPwd((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            >
+              {showPwd ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          {error && (
+            <p
+              data-ocid="admin.error_state"
+              className="text-xs text-destructive"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+        <Button
+          data-ocid="admin.submit_button"
+          className="w-full font-bold"
+          onClick={handleSubmit}
+        >
+          Login
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Product Image (uses storageClient) ────────────────────────────────────────
+function ProductThumb({ imageId }: { imageId: string }) {
+  const storageClient = useStorageClient();
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageId || !storageClient) return;
+    storageClient
+      .getDirectURL(imageId)
+      .then(setUrl)
+      .catch(() => setUrl(null));
+  }, [imageId, storageClient]);
+
+  if (!imageId || !url) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-xl">
+        🥦
+      </div>
+    );
   }
-  return { todayOrders, yesterdayOrders, pastGroups };
+  return <img src={url} alt="product" className="w-full h-full object-cover" />;
 }
 
-function parseDiscount(discountText: string): {
-  pct: string;
-  minOrder: string;
-} {
-  if (!discountText) return { pct: "", minOrder: "" };
-  const parts = discountText.split("|");
-  if (parts.length === 2) return { pct: parts[0], minOrder: parts[1] };
-  return { pct: "", minOrder: "" };
+// ─── Product Form ─────────────────────────────────────────────────────────────
+interface ProductFormData {
+  name: string;
+  unitType: UnitType;
+  price: string;
+  stock: string;
+  imageId: string;
 }
 
-function OrderCard({ order }: { order: Order }) {
+const defaultForm = (): ProductFormData => ({
+  name: "",
+  unitType: "kg",
+  price: "",
+  stock: "",
+  imageId: "",
+});
+
+function ProductForm({
+  initial,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  initial?: ProductFormData;
+  onSave: (data: ProductFormData) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [form, setForm] = useState<ProductFormData>(initial ?? defaultForm());
+  const storageClient = useStorageClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !storageClient) return;
+    setUploading(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const { hash } = await storageClient.putFile(uint8);
+      setForm((prev) => ({ ...prev, imageId: hash }));
+      toast.success("Image uploaded!");
+    } catch {
+      toast.error("Image upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Product Name</Label>
+        <Input
+          data-ocid="admin.products.input"
+          placeholder="e.g. Fresh Tomatoes"
+          value={form.name}
+          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Unit Type</Label>
+        <Select
+          value={form.unitType}
+          onValueChange={(v) =>
+            setForm((p) => ({ ...p, unitType: v as UnitType }))
+          }
+        >
+          <SelectTrigger data-ocid="admin.products.select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.entries(UNIT_LABELS) as [UnitType, string][]).map(
+              ([val, label]) => (
+                <SelectItem key={val} value={val}>
+                  {label}
+                </SelectItem>
+              ),
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">
+          {PRICE_LABELS[form.unitType]}
+        </Label>
+        <Input
+          data-ocid="admin.products.input"
+          type="number"
+          placeholder="0"
+          value={form.price}
+          onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Stock</Label>
+        <Input
+          data-ocid="admin.products.input"
+          type="number"
+          placeholder="0"
+          value={form.stock}
+          onChange={(e) => setForm((p) => ({ ...p, stock: e.target.value }))}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Product Image</Label>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+        <Button
+          type="button"
+          data-ocid="admin.products.upload_button"
+          variant="outline"
+          className="w-full"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || !storageClient}
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="w-4 h-4 mr-2" />{" "}
+              {form.imageId ? "Change Photo" : "Upload Photo"}
+            </>
+          )}
+        </Button>
+        {form.imageId && (
+          <p className="text-xs text-primary font-medium">✓ Image uploaded</p>
+        )}
+      </div>
+
+      <DialogFooter className="pt-2 gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          data-ocid="admin.products.cancel_button"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          data-ocid="admin.products.save_button"
+          onClick={() => onSave(form)}
+          disabled={isSaving || uploading}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+            </>
+          ) : (
+            "Save Product"
+          )}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+// ─── Products Tab ─────────────────────────────────────────────────────────────
+function ProductsTab() {
+  const { data: products, isLoading } = useProducts();
+  const addProduct = useAddProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+
+  const handleAdd = async (data: ProductFormData) => {
+    if (!data.name || !data.price || !data.stock) {
+      toast.error("Please fill all fields");
+      return;
+    }
+    try {
+      await addProduct.mutateAsync({
+        name: data.name,
+        price: BigInt(Math.round(Number(data.price))),
+        stock: BigInt(Math.round(Number(data.stock))),
+        imageId: data.imageId,
+        category: data.unitType,
+      });
+      setShowAdd(false);
+      toast.success("Product added!");
+    } catch {
+      toast.error("Failed to add product");
+    }
+  };
+
+  const handleEdit = async (data: ProductFormData) => {
+    if (!editProduct) return;
+    try {
+      await updateProduct.mutateAsync({
+        id: editProduct.id,
+        name: data.name,
+        price: BigInt(Math.round(Number(data.price))),
+        stock: BigInt(Math.round(Number(data.stock))),
+        imageId: data.imageId,
+        category: data.unitType,
+      });
+      setEditProduct(null);
+      toast.success("Product updated!");
+    } catch {
+      toast.error("Failed to update product");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Button
+        data-ocid="admin.products.open_modal_button"
+        className="w-full font-bold"
+        onClick={() => setShowAdd(true)}
+      >
+        <Plus className="w-4 h-4 mr-2" /> Add New Product
+      </Button>
+
+      {/* Add Dialog */}
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-sm mx-4">
+          <DialogHeader>
+            <DialogTitle className="font-display">Add New Product</DialogTitle>
+          </DialogHeader>
+          <ProductForm
+            onSave={handleAdd}
+            onCancel={() => setShowAdd(false)}
+            isSaving={addProduct.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={!!editProduct}
+        onOpenChange={(open) => !open && setEditProduct(null)}
+      >
+        <DialogContent className="max-w-sm mx-4">
+          <DialogHeader>
+            <DialogTitle className="font-display">Edit Product</DialogTitle>
+          </DialogHeader>
+          {editProduct && (
+            <ProductForm
+              initial={{
+                name: editProduct.name,
+                unitType: (editProduct.category as UnitType) || "kg",
+                price: String(Number(editProduct.price)),
+                stock: String(Number(editProduct.stock)),
+                imageId: editProduct.imageId,
+              }}
+              onSave={handleEdit}
+              onCancel={() => setEditProduct(null)}
+              isSaving={updateProduct.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {isLoading ? (
+        <div data-ocid="admin.products.loading_state" className="space-y-2">
+          {["p1", "p2", "p3"].map((k) => (
+            <Skeleton key={k} className="h-16 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : !products?.length ? (
+        <div
+          data-ocid="admin.products.empty_state"
+          className="text-center py-12"
+        >
+          <Package className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="text-sm text-muted-foreground">
+            No products yet. Add your first product!
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {products.map((product: Product, idx: number) => (
+            <div
+              key={product.id.toString()}
+              data-ocid={`admin.products.item.${idx + 1}`}
+              className="bg-card rounded-xl p-3 flex items-center gap-3 shadow-xs"
+            >
+              <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0">
+                <ProductThumb imageId={product.imageId} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-bold text-sm truncate">
+                  {product.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  ₹{Number(product.price)}/{product.category || "kg"} • Stock:{" "}
+                  {Number(product.stock)}
+                </p>
+              </div>
+              <div className="flex gap-1.5">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  data-ocid={`admin.products.edit_button.${idx + 1}`}
+                  className="w-8 h-8"
+                  onClick={() => setEditProduct(product)}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      data-ocid={`admin.products.delete_button.${idx + 1}`}
+                      className="w-8 h-8"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete "{product.name}"?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-ocid="admin.products.cancel_button">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        data-ocid="admin.products.confirm_button"
+                        onClick={() => {
+                          deleteProduct.mutate(product.id);
+                          toast.success("Product deleted");
+                        }}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Orders Tab ───────────────────────────────────────────────────────────────
+function formatOrderDate(ts: bigint): string {
+  const ms = Number(ts) / 1_000_000;
+  const date = new Date(ms);
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function isSameDay(ts: bigint, ref: Date): boolean {
+  const ms = Number(ts) / 1_000_000;
+  const d = new Date(ms);
+  return (
+    d.getFullYear() === ref.getFullYear() &&
+    d.getMonth() === ref.getMonth() &&
+    d.getDate() === ref.getDate()
+  );
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  processing: "bg-blue-100 text-blue-800",
+  delivered: "bg-green-100 text-green-800",
+  cancelled: "bg-red-100 text-red-800",
+};
+
+function OrderCard({ order, idx }: { order: Order; idx: number }) {
   const updateStatus = useUpdateOrderStatus();
   const deleteOrder = useDeleteOrder();
 
-  const handleStatus = async (status: string) => {
-    try {
-      await updateStatus.mutateAsync({ orderId: order.id, status });
-      toast.success("Status updated");
-    } catch {
-      toast.error("Failed to update status");
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      await deleteOrder.mutateAsync(order.id);
-      toast.success("Order deleted");
-    } catch {
-      toast.error("Failed to delete order");
-    }
-  };
-
   const statusColor =
-    order.status === "Delivered"
-      ? "#16a34a"
-      : order.status === "Processing"
-        ? "#d97706"
-        : "#6b7280";
+    STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-800";
 
   return (
-    <div className="bg-white rounded-xl p-3 shadow-card space-y-2 border border-border">
+    <div
+      data-ocid={`admin.orders.item.${idx + 1}`}
+      className="bg-card rounded-xl p-4 shadow-xs space-y-3"
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="font-bold text-sm">{order.customerName}</p>
+          <p className="font-display font-bold text-sm">{order.customerName}</p>
           <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
-          <p className="text-xs text-muted-foreground">
-            {order.customerAddress}
-          </p>
         </div>
-        <div className="text-right">
-          <p className="font-extrabold text-sm" style={{ color: "#15803d" }}>
-            ₹{String(order.totalAmount)}
-          </p>
-          <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
-        </div>
-      </div>
-      <div className="text-xs text-muted-foreground">
-        {order.items.map((item) => (
-          <span key={item.productName}>
-            {item.productName} ×{String(item.quantity)}
-            {""}
-          </span>
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        <Badge
-          style={{
-            backgroundColor: statusColor,
-            color: "white",
-            fontSize: "11px",
-          }}
+        <span
+          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}
         >
           {order.status}
-        </Badge>
-        <Select value={order.status} onValueChange={handleStatus}>
+        </span>
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        {order.customerAddress}
+      </div>
+
+      <div className="space-y-0.5">
+        {order.items.map((item) => (
+          <p
+            key={`${String(item.productId)}-${item.productName}`}
+            className="text-xs"
+          >
+            {item.productName} × {Number(item.quantity)} — ₹{Number(item.price)}
+          </p>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
+          <p className="font-bold text-sm">
+            Total: ₹{Number(order.totalAmount)}
+          </p>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {formatOrderDate(order.createdAt)}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Select
+          value={order.status}
+          onValueChange={(s) =>
+            updateStatus.mutate({ orderId: order.id, status: s })
+          }
+        >
           <SelectTrigger
-            data-ocid="admin.order.select"
-            className="h-7 text-xs w-auto flex-1"
+            data-ocid={`admin.orders.select.${idx + 1}`}
+            className="h-8 text-xs flex-1"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Processing">Processing</SelectItem>
-            <SelectItem value="Delivered">Delivered</SelectItem>
+            {["pending", "processing", "delivered", "cancelled"].map((s) => (
+              <SelectItem key={s} value={s} className="text-xs capitalize">
+                {s}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        {order.status === "Delivered" && (
+
+        {order.status === "delivered" && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
-                data-ocid="admin.order.delete_button"
-                size="icon"
+                size="sm"
                 variant="destructive"
-                className="h-7 w-7 flex-shrink-0"
+                data-ocid={`admin.orders.delete_button.${idx + 1}`}
+                className="h-8"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
@@ -182,23 +654,18 @@ function OrderCard({ order }: { order: Order }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Order</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Delete order for {order.customerName}? This cannot be undone.
+                  Delete this delivered order from {order.customerName}?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-ocid="admin.order.cancel_button">
+                <AlertDialogCancel data-ocid="admin.orders.cancel_button">
                   Cancel
                 </AlertDialogCancel>
                 <AlertDialogAction
-                  data-ocid="admin.order.confirm_button"
-                  onClick={handleDelete}
-                  className="bg-destructive text-destructive-foreground"
+                  data-ocid="admin.orders.confirm_button"
+                  onClick={() => deleteOrder.mutate(order.id)}
                 >
-                  {deleteOrder.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Delete"
-                  )}
+                  Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -209,589 +676,292 @@ function OrderCard({ order }: { order: Order }) {
   );
 }
 
-function ProductForm({
-  initial,
-  onSave,
-  onCancel,
-  isPending,
-}: {
-  initial?: Product;
-  onSave: (data: {
-    name: string;
-    price: bigint;
-    stock: bigint;
-    imageId: string;
-  }) => void;
-  onCancel?: () => void;
-  isPending: boolean;
-}) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [price, setPrice] = useState(initial ? String(initial.price) : "");
-  const [stock, setStock] = useState(initial ? String(initial.stock) : "");
-  const [imageId, setImageId] = useState(initial?.imageId ?? "");
+function OrdersTab() {
+  const { data: orders, isLoading } = useOrders();
 
-  return (
-    <div className="space-y-3">
-      <div>
-        <Label className="font-bold">Product Name</Label>
-        <Input
-          data-ocid="admin.product.input"
-          placeholder="e.g. Tomatoes"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mt-1"
-        />
-      </div>
-      <div>
-        <Label className="font-bold">Price per kg (₹)</Label>
-        <Input
-          data-ocid="admin.product.input"
-          type="number"
-          placeholder="e.g. 60"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          className="mt-1"
-        />
-      </div>
-      <div>
-        <Label className="font-bold">Stock (kg)</Label>
-        <Input
-          data-ocid="admin.product.input"
-          type="number"
-          placeholder="e.g. 50"
-          value={stock}
-          onChange={(e) => setStock(e.target.value)}
-          className="mt-1"
-        />
-      </div>
-      <div>
-        <Label className="font-bold">Image URL</Label>
-        <Input
-          data-ocid="admin.product.input"
-          placeholder="https://... or /assets/..."
-          value={imageId}
-          onChange={(e) => setImageId(e.target.value)}
-          className="mt-1"
-        />
-      </div>
-      <div className="flex gap-2">
-        {onCancel && (
-          <Button
-            data-ocid="admin.product.cancel_button"
-            variant="outline"
-            className="flex-1"
-            onClick={onCancel}
-          >
-            Cancel
-          </Button>
-        )}
-        <Button
-          data-ocid="admin.product.save_button"
-          className="flex-1 font-bold"
-          style={{ backgroundColor: "#4d7c0f", color: "white" }}
-          disabled={isPending}
-          onClick={() => {
-            if (!name || !price || !stock) {
-              toast.error("Please fill name, price, and stock");
-              return;
-            }
-            onSave({
-              name,
-              price: BigInt(Math.round(Number.parseFloat(price))),
-              stock: BigInt(Math.round(Number.parseFloat(stock))),
-              imageId,
-            });
-          }}
-        >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-        </Button>
-      </div>
-    </div>
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const todayOrders = (orders ?? []).filter((o: Order) =>
+    isSameDay(o.createdAt, now),
   );
-}
-
-export default function AdminPage() {
-  const [isAdmin, setIsAdmin] = useState(
-    () => localStorage.getItem(ADMIN_KEY) === "true",
+  const yesterdayOrders = (orders ?? []).filter((o: Order) =>
+    isSameDay(o.createdAt, yesterday),
   );
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState(false);
-  const [editingId, setEditingId] = useState<bigint | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [deliveryInput, setDeliveryInput] = useState("");
-  const [discountPct, setDiscountPct] = useState("");
-  const [discountMin, setDiscountMin] = useState("");
+  const pastOrders = (orders ?? []).filter(
+    (o: Order) =>
+      !isSameDay(o.createdAt, now) && !isSameDay(o.createdAt, yesterday),
+  );
 
-  const { data: products, isLoading: productsLoading } = useProducts();
-  const { data: orders, isLoading: ordersLoading } = useOrders();
-  const { data: deliveryTiming } = useDeliveryTiming();
-  const { data: discountText } = useDiscount();
-
-  const addProduct = useAddProduct();
-  const updateProduct = useUpdateProduct();
-  const deleteProduct = useDeleteProduct();
-  const setDeliveryTiming = useSetDeliveryTiming();
-  const setDiscount = useSetDiscount();
-
-  useEffect(() => {
-    if (deliveryTiming) setDeliveryInput(deliveryTiming);
-  }, [deliveryTiming]);
-
-  useEffect(() => {
-    if (discountText) {
-      const parsed = parseDiscount(discountText);
-      setDiscountPct(parsed.pct);
-      setDiscountMin(parsed.minOrder);
-    }
-  }, [discountText]);
-
-  const handleLogin = () => {
-    if (password === ADMIN_PASSWORD) {
-      localStorage.setItem(ADMIN_KEY, "true");
-      setIsAdmin(true);
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem(ADMIN_KEY);
-    setIsAdmin(false);
-  };
-
-  const handleAddProduct = async (data: {
-    name: string;
-    price: bigint;
-    stock: bigint;
-    imageId: string;
-  }) => {
-    try {
-      await addProduct.mutateAsync({ ...data, category: "vegetables" });
-      toast.success("Product added!");
-      setShowAddForm(false);
-    } catch {
-      toast.error("Failed to add product");
-    }
-  };
-
-  const handleUpdateProduct = async (
-    id: bigint,
-    data: { name: string; price: bigint; stock: bigint; imageId: string },
-  ) => {
-    try {
-      await updateProduct.mutateAsync({ id, ...data, category: "vegetables" });
-      toast.success("Product updated!");
-      setEditingId(null);
-    } catch {
-      toast.error("Failed to update product");
-    }
-  };
-
-  const handleDeleteProduct = async (id: bigint) => {
-    try {
-      await deleteProduct.mutateAsync(id);
-      toast.success("Product deleted");
-    } catch {
-      toast.error("Failed to delete product");
-    }
-  };
-
-  const handleSaveDelivery = async () => {
-    try {
-      await setDeliveryTiming.mutateAsync(deliveryInput);
-      toast.success("Delivery timing updated!");
-    } catch {
-      toast.error("Failed to save delivery timing");
-    }
-  };
-
-  const handleSaveDiscount = async () => {
-    const pct = Number.parseFloat(discountPct);
-    const min = Number.parseFloat(discountMin);
-    if (Number.isNaN(pct) || Number.isNaN(min) || pct < 0 || min < 0) {
-      toast.error("Please enter valid discount values");
-      return;
-    }
-    try {
-      await setDiscount.mutateAsync(`${pct}|${min}`);
-      toast.success("Discount saved!");
-    } catch {
-      toast.error("Failed to save discount");
-    }
-  };
-
-  if (!isAdmin) {
+  const renderGroup = (title: string, group: Order[], startIdx: number) => {
+    if (group.length === 0) return null;
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
-        <div className="bg-white rounded-2xl shadow-card-lg p-6 w-full max-w-sm space-y-4">
-          <div className="text-center">
-            <Lock
-              className="w-10 h-10 mx-auto mb-2"
-              style={{ color: "#4d7c0f" }}
-            />
-            <h2 className="text-xl font-bold">Admin Login</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Enter password to continue
-            </p>
-          </div>
-          <div>
-            <Input
-              data-ocid="admin.login.input"
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className={loginError ? "border-red-500" : ""}
-            />
-            {loginError && (
-              <p
-                data-ocid="admin.login.error_state"
-                className="text-xs text-red-500 mt-1"
-              >
-                Incorrect password
-              </p>
-            )}
-          </div>
-          <Button
-            data-ocid="admin.login.submit_button"
-            className="w-full font-bold"
-            style={{ backgroundColor: "#f97316", color: "white" }}
-            onClick={handleLogin}
-          >
-            Login
-          </Button>
-        </div>
+      <div className="space-y-2">
+        <h3 className="font-display font-bold text-sm text-foreground/70 uppercase tracking-wide">
+          {title}
+        </h3>
+        {group.map((order: Order, i: number) => (
+          <OrderCard
+            key={order.id.toString()}
+            order={order}
+            idx={startIdx + i}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div data-ocid="admin.orders.loading_state" className="space-y-2">
+        {["o1", "o2", "o3"].map((k) => (
+          <Skeleton key={k} className="h-32 w-full rounded-xl" />
+        ))}
       </div>
     );
   }
 
-  const { todayOrders, yesterdayOrders, pastGroups } = groupOrders(
-    orders ?? [],
+  if (!orders?.length) {
+    return (
+      <div data-ocid="admin.orders.empty_state" className="text-center py-12">
+        <p className="text-sm text-muted-foreground">No orders yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {renderGroup("Today", todayOrders, 0)}
+      {renderGroup("Yesterday", yesterdayOrders, todayOrders.length)}
+      {renderGroup(
+        "Past",
+        pastOrders,
+        todayOrders.length + yesterdayOrders.length,
+      )}
+    </div>
   );
+}
+
+// ─── Delivery Tab ─────────────────────────────────────────────────────────────
+function DeliveryTab() {
+  const { data: currentTiming } = useDeliveryTiming();
+  const setTiming = useSetDeliveryTiming();
+  const [value, setValue] = useState("");
+
+  const handleSave = async () => {
+    if (!value.trim()) {
+      toast.error("Please enter delivery timing");
+      return;
+    }
+    try {
+      await setTiming.mutateAsync(value.trim());
+      toast.success("Delivery timing updated!");
+      setValue("");
+    } catch {
+      toast.error("Failed to update timing");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {currentTiming && (
+        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
+          <p className="text-xs font-semibold text-muted-foreground mb-1">
+            Current Timing
+          </p>
+          <p className="font-display font-bold text-foreground">
+            {currentTiming}
+          </p>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">New Delivery Timing</Label>
+        <Input
+          data-ocid="admin.delivery.input"
+          placeholder="e.g. 9 AM - 1 PM"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+      </div>
+      <Button
+        data-ocid="admin.delivery.save_button"
+        className="w-full font-bold"
+        onClick={handleSave}
+        disabled={setTiming.isPending}
+      >
+        {setTiming.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+          </>
+        ) : (
+          "Save Timing"
+        )}
+      </Button>
+    </div>
+  );
+}
+
+// ─── Discount Tab ─────────────────────────────────────────────────────────────
+function DiscountTab() {
+  const { data: discountRaw } = useDiscount();
+  const setDiscount = useSetDiscount();
+
+  const parsed = parseDiscount(discountRaw ?? "");
+  const [percentage, setPercentage] = useState("");
+  const [minimumAmount, setMinimumAmount] = useState("");
+
+  const handleSave = async () => {
+    const pct = Number(percentage);
+    const min = Number(minimumAmount);
+    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+      toast.error("Enter a valid percentage (0-100)");
+      return;
+    }
+    if (Number.isNaN(min) || min < 0) {
+      toast.error("Enter a valid minimum amount");
+      return;
+    }
+    try {
+      await setDiscount.mutateAsync(
+        JSON.stringify({ percentage: pct, minimumAmount: min }),
+      );
+      toast.success("Discount updated!");
+      setPercentage("");
+      setMinimumAmount("");
+    } catch {
+      toast.error("Failed to update discount");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {parsed && parsed.percentage > 0 && (
+        <div className="bg-accent/20 border border-accent/40 rounded-xl p-4">
+          <p className="text-xs font-semibold text-muted-foreground mb-1">
+            Current Discount
+          </p>
+          <p className="font-display font-bold text-accent-foreground">
+            {parsed.percentage}% off on orders above ₹{parsed.minimumAmount}
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Discount Percentage (%)</Label>
+        <Input
+          data-ocid="admin.discount.input"
+          type="number"
+          placeholder={parsed ? String(parsed.percentage) : "e.g. 10"}
+          value={percentage}
+          onChange={(e) => setPercentage(e.target.value)}
+          min="0"
+          max="100"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">
+          Minimum Order Amount (₹)
+        </Label>
+        <Input
+          data-ocid="admin.discount.input"
+          type="number"
+          placeholder={parsed ? String(parsed.minimumAmount) : "e.g. 300"}
+          value={minimumAmount}
+          onChange={(e) => setMinimumAmount(e.target.value)}
+          min="0"
+        />
+      </div>
+
+      {percentage && minimumAmount && (
+        <div className="bg-secondary/60 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+          Preview: Customers get <strong>{percentage}%</strong> off on orders
+          above ₹{minimumAmount}
+        </div>
+      )}
+
+      <Button
+        data-ocid="admin.discount.save_button"
+        className="w-full font-bold"
+        onClick={handleSave}
+        disabled={setDiscount.isPending}
+      >
+        {setDiscount.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+          </>
+        ) : (
+          "Save Discount"
+        )}
+      </Button>
+    </div>
+  );
+}
+
+// ─── Admin Page ───────────────────────────────────────────────────────────────
+export default function AdminPage() {
+  // Always start locked -- password required every time
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  if (!isAdmin) {
+    return <PasswordGate onSuccess={() => setIsAdmin(true)} />;
+  }
 
   return (
     <div className="px-3 py-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Admin Panel</h2>
-        <Button
-          data-ocid="admin.logout.button"
-          variant="outline"
-          size="sm"
-          className="text-xs"
-          onClick={handleLogout}
-        >
+        <h2 className="font-display text-xl font-bold text-foreground">
+          Admin Panel
+        </h2>
+        <Button size="sm" variant="outline" onClick={() => setIsAdmin(false)}>
           Logout
         </Button>
       </div>
 
       <Tabs defaultValue="products">
-        <TabsList className="w-full mb-4 grid grid-cols-4 h-auto">
+        <TabsList className="w-full grid grid-cols-4 mb-4">
           <TabsTrigger
             data-ocid="admin.products.tab"
             value="products"
-            className="text-xs py-2"
+            className="text-xs"
           >
-            <Package className="w-3.5 h-3.5 mr-1" />
-            Products
+            <Package className="w-3.5 h-3.5 mr-1" /> Products
           </TabsTrigger>
           <TabsTrigger
             data-ocid="admin.orders.tab"
             value="orders"
-            className="text-xs py-2"
+            className="text-xs"
           >
-            <ShoppingBag className="w-3.5 h-3.5 mr-1" />
             Orders
           </TabsTrigger>
           <TabsTrigger
             data-ocid="admin.delivery.tab"
             value="delivery"
-            className="text-xs py-2"
+            className="text-xs"
           >
-            Delivery
+            <Clock className="w-3.5 h-3.5 mr-1" /> Delivery
           </TabsTrigger>
           <TabsTrigger
             data-ocid="admin.discount.tab"
             value="discount"
-            className="text-xs py-2"
+            className="text-xs"
           >
-            Discount
+            <Tag className="w-3.5 h-3.5 mr-1" /> Discount
           </TabsTrigger>
         </TabsList>
 
-        {/* Products Tab */}
-        <TabsContent value="products" className="space-y-3">
-          <Button
-            data-ocid="admin.product.open_modal_button"
-            className="w-full font-bold"
-            style={{ backgroundColor: "#4d7c0f", color: "white" }}
-            onClick={() => setShowAddForm((v) => !v)}
-          >
-            {showAddForm ? "Cancel" : "+ Add Product"}
-          </Button>
-
-          {showAddForm && (
-            <div className="bg-white rounded-xl p-4 shadow-card border border-border">
-              <h3 className="font-bold mb-3">Add New Product</h3>
-              <ProductForm
-                onSave={handleAddProduct}
-                onCancel={() => setShowAddForm(false)}
-                isPending={addProduct.isPending}
-              />
-            </div>
-          )}
-
-          {productsLoading ? (
-            <div
-              data-ocid="admin.products.loading_state"
-              className="text-center py-8 text-muted-foreground"
-            >
-              Loading products...
-            </div>
-          ) : (products ?? []).length === 0 ? (
-            <div
-              data-ocid="admin.products.empty_state"
-              className="text-center py-8 text-muted-foreground"
-            >
-              No products yet. Add your first product!
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {(products ?? []).map((product, idx) => (
-                <div
-                  key={String(product.id)}
-                  data-ocid={`admin.product.item.${idx + 1}`}
-                  className="bg-white rounded-xl p-3 shadow-card border border-border"
-                >
-                  {editingId === product.id ? (
-                    <>
-                      <p className="font-bold text-sm mb-3">
-                        Editing: {product.name}
-                      </p>
-                      <ProductForm
-                        initial={product}
-                        onSave={(data) => handleUpdateProduct(product.id, data)}
-                        onCancel={() => setEditingId(null)}
-                        isPending={updateProduct.isPending}
-                      />
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      {product.imageId && (
-                        <img
-                          src={product.imageId}
-                          alt={product.name}
-                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display =
-                              "none";
-                          }}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm">{product.name}</p>
-                        <p className="text-xs" style={{ color: "#15803d" }}>
-                          <span className="font-extrabold">
-                            ₹{String(product.price)}/kg
-                          </span>
-                          {" · "}
-                          Stock: {String(product.stock)}kg
-                        </p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          data-ocid={`admin.product.edit_button.${idx + 1}`}
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8"
-                          onClick={() => setEditingId(product.id)}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              data-ocid={`admin.product.delete_button.${idx + 1}`}
-                              size="icon"
-                              variant="destructive"
-                              className="h-8 w-8"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Delete Product
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Delete "{product.name}"? This cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteProduct(product.id)}
-                                className="bg-destructive text-destructive-foreground"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+        <TabsContent value="products">
+          <ProductsTab />
         </TabsContent>
-
-        {/* Orders Tab */}
-        <TabsContent value="orders" className="space-y-4">
-          {ordersLoading ? (
-            <div
-              data-ocid="admin.orders.loading_state"
-              className="text-center py-8 text-muted-foreground"
-            >
-              Loading orders...
-            </div>
-          ) : (orders ?? []).length === 0 ? (
-            <div
-              data-ocid="admin.orders.empty_state"
-              className="text-center py-8 text-muted-foreground"
-            >
-              No orders yet.
-            </div>
-          ) : (
-            <>
-              {todayOrders.length > 0 && (
-                <section>
-                  <h3 className="font-bold text-sm mb-2 text-foreground">
-                    Today
-                  </h3>
-                  <div className="space-y-2">
-                    {todayOrders.map((o) => (
-                      <OrderCard key={String(o.id)} order={o} />
-                    ))}
-                  </div>
-                </section>
-              )}
-              {yesterdayOrders.length > 0 && (
-                <section>
-                  <h3 className="font-bold text-sm mb-2 text-foreground">
-                    Yesterday
-                  </h3>
-                  <div className="space-y-2">
-                    {yesterdayOrders.map((o) => (
-                      <OrderCard key={String(o.id)} order={o} />
-                    ))}
-                  </div>
-                </section>
-              )}
-              {Object.entries(pastGroups)
-                .sort(
-                  (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime(),
-                )
-                .map(([date, dateOrders]) => (
-                  <section key={date}>
-                    <h3 className="font-bold text-sm mb-2 text-foreground">
-                      {date}
-                    </h3>
-                    <div className="space-y-2">
-                      {dateOrders.map((o) => (
-                        <OrderCard key={String(o.id)} order={o} />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-            </>
-          )}
+        <TabsContent value="orders">
+          <OrdersTab />
         </TabsContent>
-
-        {/* Delivery Timing Tab */}
-        <TabsContent value="delivery" className="space-y-4">
-          <div className="bg-white rounded-xl p-4 shadow-card border border-border space-y-3">
-            <h3 className="font-bold">Delivery Timing</h3>
-            <p className="text-sm text-muted-foreground">
-              Set the delivery time message shown to customers.
-            </p>
-            <Input
-              data-ocid="admin.delivery.input"
-              placeholder="e.g. Delivery between 6am - 9am"
-              value={deliveryInput}
-              onChange={(e) => setDeliveryInput(e.target.value)}
-            />
-            <Button
-              data-ocid="admin.delivery.save_button"
-              className="w-full font-bold"
-              style={{ backgroundColor: "#4d7c0f", color: "white" }}
-              disabled={setDeliveryTiming.isPending}
-              onClick={handleSaveDelivery}
-            >
-              {setDeliveryTiming.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Save Timing"
-              )}
-            </Button>
-          </div>
+        <TabsContent value="delivery">
+          <DeliveryTab />
         </TabsContent>
-
-        {/* Discount Tab */}
-        <TabsContent value="discount" className="space-y-4">
-          <div className="bg-white rounded-xl p-4 shadow-card border border-border space-y-3">
-            <h3 className="font-bold">Store Discount</h3>
-            <p className="text-sm text-muted-foreground">
-              Set a discount for customers who meet a minimum order amount.
-            </p>
-            <div>
-              <Label className="font-bold">Discount %</Label>
-              <Input
-                data-ocid="admin.discount.input"
-                type="number"
-                placeholder="e.g. 10"
-                value={discountPct}
-                onChange={(e) => setDiscountPct(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="font-bold">Minimum Order Amount (₹)</Label>
-              <Input
-                data-ocid="admin.discount.input"
-                type="number"
-                placeholder="e.g. 300"
-                value={discountMin}
-                onChange={(e) => setDiscountMin(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            {discountPct && discountMin && (
-              <div
-                className="px-3 py-2 rounded-lg text-sm font-bold"
-                style={{ backgroundColor: "#fef9c3", color: "#854d0e" }}
-              >
-                Preview: {discountPct}% off on orders of ₹{discountMin} and
-                above
-              </div>
-            )}
-            <Button
-              data-ocid="admin.discount.save_button"
-              className="w-full font-bold"
-              style={{ backgroundColor: "#4d7c0f", color: "white" }}
-              disabled={setDiscount.isPending}
-              onClick={handleSaveDiscount}
-            >
-              {setDiscount.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Save Discount"
-              )}
-            </Button>
-          </div>
+        <TabsContent value="discount">
+          <DiscountTab />
         </TabsContent>
       </Tabs>
     </div>

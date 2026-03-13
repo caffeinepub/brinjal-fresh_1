@@ -1,18 +1,18 @@
 import Map "mo:core/Map";
-import Order "mo:core/Order";
-import Nat "mo:core/Nat";
-import Principal "mo:core/Principal";
 import AccessControl "authorization/access-control";
 import MixinStorage "blob-storage/Mixin";
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
+import Nat "mo:core/Nat";
 
 actor {
+  // Keep for upgrade compatibility with previous version
   let accessControlState = AccessControl.initState();
 
   include MixinStorage();
 
-  type Product = {
+  // ── Old types kept for stable-variable compatibility ──────────────────────
+  type OldProduct = {
     id : Nat;
     name : Text;
     price : Nat;
@@ -21,179 +21,185 @@ actor {
     category : Text;
   };
 
-  type OrderItem = {
+  type OldOrderItem = {
     productId : Nat;
     productName : Text;
     quantity : Nat;
     price : Nat;
   };
 
-  type CustomerOrder = {
+  type OldOrder = {
     id : Nat;
     customerName : Text;
     customerPhone : Text;
     customerAddress : Text;
     paymentMethod : Text;
-    items : [OrderItem];
+    items : [OldOrderItem];
     totalAmount : Nat;
     status : Text;
     createdAt : Int;
   };
 
-  type Feedback = {
+  type OldFeedback = {
     id : Nat;
     customerName : Text;
     message : Text;
     createdAt : Int;
   };
 
-  module Product {
-    public func compare(p1 : Product, p2 : Product) : Order.Order {
-      Nat.compare(p1.id, p2.id);
-    };
-  };
+  // Old stable maps -- kept for upgrade compatibility, not used by new logic
+  let products = Map.empty<Nat, OldProduct>();
+  let orders = Map.empty<Nat, OldOrder>();
+  let feedbacks = Map.empty<Nat, OldFeedback>();
 
-  let products = Map.empty<Nat, Product>();
-  let orders = Map.empty<Nat, CustomerOrder>();
-  let feedbacks = Map.empty<Nat, Feedback>();
-
-  var nextProductId = 1;
-  var nextOrderId = 1;
-  var nextFeedbackId = 1;
-
-  var deliveryTiming : Text = "10am - 6pm";
+  // Old stable vars -- kept for upgrade compatibility
+  var nextFeedbackId : Nat = 1;
   var discount : Text = "";
 
-  // Product Management
-  public shared func addProduct(name : Text, price : Nat, stock : Nat, imageId : Text, category : Text) : async Nat {
-    let product : Product = {
-      id = nextProductId;
-      name;
-      price;
-      stock;
-      imageId;
-      category;
-    };
-    products.add(nextProductId, product);
-    nextProductId += 1;
-    product.id;
+  // ── New types ─────────────────────────────────────────────────────────────
+  type UnitType = { #kg; #piece; #bundle; #packet };
+
+  type StoreProduct = {
+    id : Nat;
+    name : Text;
+    unitType : UnitType;
+    pricePerUnit : Nat;
+    stock : Nat;
+    imageId : Text;
   };
 
-  public shared func updateProduct(id : Nat, name : Text, price : Nat, stock : Nat, imageId : Text, category : Text) : async () {
-    switch (products.get(id)) {
-      case (null) { Runtime.trap("Product does not exist") };
-      case (?_) {
-        let updatedProduct : Product = {
-          id;
-          name;
-          price;
-          stock;
-          imageId;
-          category;
-        };
-        products.add(id, updatedProduct);
-      };
+  type OrderItem = {
+    productId : Nat;
+    productName : Text;
+    quantityLabel : Text;
+    unitPrice : Nat;
+    itemTotal : Nat;
+  };
+
+  type CustomerOrder = {
+    id : Nat;
+    customerName : Text;
+    phone : Text;
+    address : Text;
+    items : [OrderItem];
+    subtotal : Nat;
+    discountAmount : Nat;
+    totalAmount : Nat;
+    paymentMethod : Text;
+    status : Text;
+    createdAt : Int;
+  };
+
+  type DiscountSettings = {
+    percentage : Nat;
+    minimumAmount : Nat;
+  };
+
+  // ── New stable state ──────────────────────────────────────────────────────
+  var nextProductId : Nat = 1;
+  var nextOrderId : Nat = 1;
+  var deliveryTiming : Text = "10am - 6pm";
+  var discountPercentage : Nat = 0;
+  var discountMinimum : Nat = 0;
+
+  let storeProducts = Map.empty<Nat, StoreProduct>();
+  let customerOrders = Map.empty<Nat, CustomerOrder>();
+
+  // ── Product methods ───────────────────────────────────────────────────────
+  public shared func addProduct(name : Text, unitType : UnitType, pricePerUnit : Nat, stock : Nat, imageId : Text) : async Nat {
+    let id = nextProductId;
+    storeProducts.add(id, { id; name; unitType; pricePerUnit; stock; imageId });
+    nextProductId += 1;
+    id
+  };
+
+  public shared func updateProduct(id : Nat, name : Text, unitType : UnitType, pricePerUnit : Nat, stock : Nat, imageId : Text) : async () {
+    switch (storeProducts.get(id)) {
+      case (null) { Runtime.trap("Product not found") };
+      case (?_) { storeProducts.add(id, { id; name; unitType; pricePerUnit; stock; imageId }) };
     };
   };
 
   public shared func deleteProduct(id : Nat) : async () {
-    switch (products.get(id)) {
-      case (null) { Runtime.trap("Product does not exist") };
-      case (?_) { products.remove(id) };
-    };
+    storeProducts.remove(id);
   };
 
-  public query func getProducts() : async [Product] {
-    products.values().toArray().sort();
+  public query func getProducts() : async [StoreProduct] {
+    storeProducts.values().toArray()
   };
 
-  public query func getProduct(id : Nat) : async Product {
-    switch (products.get(id)) {
-      case (null) { Runtime.trap("Product does not exist") };
-      case (?product) { product };
-    };
-  };
-
-  // Orders
-  public shared func placeOrder(customerName : Text, customerPhone : Text, customerAddress : Text, paymentMethod : Text, items : [OrderItem]) : async Nat {
-    let totalAmount = items.values().foldLeft(0, func(acc, item) { acc + item.price * item.quantity });
-    let order : CustomerOrder = {
-      id = nextOrderId;
+  // ── Order methods ─────────────────────────────────────────────────────────
+  public shared func placeOrder(
+    customerName : Text,
+    phone : Text,
+    address : Text,
+    items : [OrderItem],
+    subtotal : Nat,
+    discountAmount : Nat,
+    totalAmount : Nat,
+    paymentMethod : Text
+  ) : async Nat {
+    let id = nextOrderId;
+    customerOrders.add(id, {
+      id;
       customerName;
-      customerPhone;
-      customerAddress;
-      paymentMethod;
+      phone;
+      address;
       items;
+      subtotal;
+      discountAmount;
       totalAmount;
+      paymentMethod;
       status = "pending";
       createdAt = Time.now();
-    };
-    orders.add(nextOrderId, order);
+    });
     nextOrderId += 1;
-    order.id;
+    id
   };
 
   public query func getOrders() : async [CustomerOrder] {
-    orders.values().toArray();
+    customerOrders.values().toArray()
   };
 
-  public shared func updateOrderStatus(orderId : Nat, status : Text) : async () {
-    switch (orders.get(orderId)) {
-      case (null) { Runtime.trap("Order does not exist") };
-      case (?order) {
-        let updatedOrder : CustomerOrder = {
-          id = order.id;
-          customerName = order.customerName;
-          customerPhone = order.customerPhone;
-          customerAddress = order.customerAddress;
-          paymentMethod = order.paymentMethod;
-          items = order.items;
-          totalAmount = order.totalAmount;
+  public shared func updateOrderStatus(id : Nat, status : Text) : async () {
+    switch (customerOrders.get(id)) {
+      case (null) { Runtime.trap("Order not found") };
+      case (?o) {
+        customerOrders.add(id, {
+          id = o.id;
+          customerName = o.customerName;
+          phone = o.phone;
+          address = o.address;
+          items = o.items;
+          subtotal = o.subtotal;
+          discountAmount = o.discountAmount;
+          totalAmount = o.totalAmount;
+          paymentMethod = o.paymentMethod;
           status;
-          createdAt = order.createdAt;
-        };
-        orders.add(orderId, updatedOrder);
+          createdAt = o.createdAt;
+        });
       };
     };
   };
 
-  public shared func deleteOrder(orderId : Nat) : async () {
-    switch (orders.get(orderId)) {
-      case (null) { Runtime.trap("Order does not exist") };
-      case (?_) { orders.remove(orderId) };
-    };
+  public shared func deleteOrder(id : Nat) : async () {
+    customerOrders.remove(id);
   };
 
-  public query func getDeliveryTiming() : async Text {
-    deliveryTiming;
-  };
+  // ── Delivery Timing ───────────────────────────────────────────────────────
+  public query func getDeliveryTiming() : async Text { deliveryTiming };
 
   public shared func setDeliveryTiming(timing : Text) : async () {
     deliveryTiming := timing;
   };
 
-  public query func getDiscount() : async Text {
-    discount;
+  // ── Discount ──────────────────────────────────────────────────────────────
+  public query func getDiscount() : async DiscountSettings {
+    { percentage = discountPercentage; minimumAmount = discountMinimum }
   };
 
-  public shared func setDiscount(discountText : Text) : async () {
-    discount := discountText;
-  };
-
-  // Feedback
-  public shared func submitFeedback(customerName : Text, message : Text) : async Nat {
-    let feedback : Feedback = {
-      id = nextFeedbackId;
-      customerName;
-      message;
-      createdAt = Time.now();
-    };
-    feedbacks.add(nextFeedbackId, feedback);
-    nextFeedbackId += 1;
-    feedback.id;
-  };
-
-  public query func getFeedbacks() : async [Feedback] {
-    feedbacks.values().toArray();
+  public shared func setDiscount(percentage : Nat, minimumAmount : Nat) : async () {
+    discountPercentage := percentage;
+    discountMinimum := minimumAmount;
   };
 };

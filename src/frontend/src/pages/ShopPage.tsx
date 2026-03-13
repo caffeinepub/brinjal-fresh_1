@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -9,231 +9,227 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Percent, Search, ShoppingCart } from "lucide-react";
-import { useState } from "react";
-import { useKart } from "../context/KartContext";
+import { Clock, Search, ShoppingCart, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import type { Product } from "../backend";
 import {
+  getOptionPrice,
+  getQuantityOptions,
+  getUnitLabel,
+  useKart,
+} from "../context/KartContext";
+import {
+  parseDiscount,
   useDeliveryTiming,
   useDiscount,
   useProducts,
 } from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 
-function parseDiscount(
-  discountText: string,
-): { pct: number; minOrder: number } | null {
-  if (!discountText) return null;
-  const parts = discountText.split("|");
-  if (parts.length === 2) {
-    const pct = Number.parseFloat(parts[0]);
-    const minOrder = Number.parseFloat(parts[1]);
-    if (!Number.isNaN(pct) && pct > 0 && !Number.isNaN(minOrder))
-      return { pct, minOrder };
+function ProductImage({ imageId }: { imageId: string }) {
+  const storageClient = useStorageClient();
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageId || !storageClient) return;
+    storageClient
+      .getDirectURL(imageId)
+      .then(setUrl)
+      .catch(() => setUrl(null));
+  }, [imageId, storageClient]);
+
+  if (!imageId || !url) {
+    return (
+      <div className="w-full aspect-square bg-secondary flex items-center justify-center rounded-t-xl">
+        <span className="text-4xl">🥦</span>
+      </div>
+    );
   }
-  return null;
+  return (
+    <div className="w-full aspect-square bg-secondary rounded-t-xl overflow-hidden">
+      <img src={url} alt="product" className="w-full h-full object-cover" />
+    </div>
+  );
 }
 
-const WEIGHT_OPTIONS = ["250gm", "500gm", "750gm", "1kg"];
+function ProductCard({ product }: { product: Product }) {
+  const { addToKart } = useKart();
+  const options = getQuantityOptions(product.category);
+  const [selectedOption, setSelectedOption] = useState(
+    options[1] ?? options[0],
+  );
 
-function getWeightPrice(basePrice: bigint, weight: string): bigint {
-  switch (weight) {
-    case "250gm":
-      return (basePrice * 25n) / 100n;
-    case "500gm":
-      return (basePrice * 50n) / 100n;
-    case "750gm":
-      return (basePrice * 75n) / 100n;
-    default:
-      return basePrice;
-  }
+  const basePrice = Number(product.price);
+  const unitLabel = getUnitLabel(product.category);
+  const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
+
+  const handleAdd = () => {
+    addToKart(product, selectedOption);
+    toast.success(`${product.name} added to kart!`);
+  };
+
+  return (
+    <div className="bg-card rounded-xl shadow-card overflow-hidden flex flex-col">
+      <ProductImage imageId={product.imageId} />
+      <div className="p-3 flex flex-col gap-2 flex-1">
+        <div>
+          <h3 className="font-display font-bold text-card-foreground text-sm leading-tight line-clamp-2">
+            {product.name}
+          </h3>
+          <p className="text-primary font-bold text-base mt-0.5">
+            ₹{basePrice}
+            <span className="text-xs font-normal text-muted-foreground">
+              {unitLabel}
+            </span>
+          </p>
+        </div>
+
+        {Number(product.stock) > 0 ? (
+          <Badge variant="secondary" className="w-fit text-xs">
+            Stock: {Number(product.stock)}
+          </Badge>
+        ) : (
+          <Badge variant="destructive" className="w-fit text-xs">
+            Out of Stock
+          </Badge>
+        )}
+
+        <Select value={selectedOption} onValueChange={setSelectedOption}>
+          <SelectTrigger
+            data-ocid="shop.product.select"
+            className="h-8 text-xs font-bold border-border"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((opt) => (
+              <SelectItem key={opt} value={opt} className="font-bold">
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <p className="text-xs text-muted-foreground">
+          Price:{" "}
+          <span className="font-bold text-foreground">₹{calculatedPrice}</span>
+        </p>
+
+        <Button
+          data-ocid="shop.product.button"
+          size="sm"
+          onClick={handleAdd}
+          disabled={Number(product.stock) === 0}
+          className="w-full mt-auto font-bold"
+        >
+          <ShoppingCart className="w-3.5 h-3.5 mr-1.5" />
+          Add to Kart
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function ShopPage() {
   const [search, setSearch] = useState("");
-  const [selectedWeights, setSelectedWeights] = useState<
-    Record<string, string>
-  >({});
   const { data: products, isLoading } = useProducts();
   const { data: deliveryTiming } = useDeliveryTiming();
-  const { data: discountText } = useDiscount();
-  const { addToKart } = useKart();
+  const { data: discountRaw } = useDiscount();
 
-  const discount = parseDiscount(discountText ?? "");
+  const discount = parseDiscount(discountRaw ?? "");
 
-  const filtered = (products ?? []).filter((p) =>
+  const filtered = (products ?? []).filter((p: Product) =>
     p.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleAddToKart = (product: (typeof filtered)[0]) => {
-    const weight = selectedWeights[String(product.id)] ?? "1kg";
-    addToKart(product, weight);
-  };
-
   return (
-    <div className="pb-2">
-      {/* Search bar */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm px-3 pt-3 pb-2 space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            data-ocid="shop.search_input"
-            type="text"
-            placeholder="Search vegetables..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
+    <div className="px-3 py-4 space-y-3">
+      {/* Delivery Timing */}
+      {deliveryTiming && (
+        <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-lg px-3 py-2">
+          <Clock className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-xs font-medium text-primary">
+            Delivery: {deliveryTiming}
+          </span>
         </div>
+      )}
 
-        {/* Discount banner */}
-        {discount && (
-          <div
-            data-ocid="shop.discount.card"
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold"
-            style={{
-              backgroundColor: "#fef9c3",
-              color: "#854d0e",
-              border: "1px solid #fde047",
-            }}
-          >
-            <Percent className="w-4 h-4 flex-shrink-0" />
-            <span>
-              {discount.pct}% off on orders of ₹{discount.minOrder} and above!
-            </span>
-          </div>
-        )}
-
-        {/* Delivery timing */}
-        {deliveryTiming && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lime-100 text-lime-800 text-xs font-semibold">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{deliveryTiming}</span>
-          </div>
-        )}
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          data-ocid="shop.search_input"
+          placeholder="Search vegetables..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 bg-card border-border"
+        />
       </div>
 
-      {/* Products grid */}
-      <div className="px-3 pt-2">
-        {isLoading ? (
-          <div
-            data-ocid="shop.loading_state"
-            className="grid grid-cols-2 gap-3"
-          >
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-56 rounded-2xl" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div
-            data-ocid="shop.empty_state"
-            className="flex flex-col items-center justify-center py-16 text-center"
-          >
-            <span className="text-4xl mb-3">🥦</span>
-            <p className="font-bold text-foreground">No vegetables found</p>
-            <p className="text-muted-foreground text-sm mt-1">
-              Try a different search term
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {filtered.map((product, idx) => {
-              const weight = selectedWeights[String(product.id)] ?? "1kg";
-              const price = getWeightPrice(product.price, weight);
-              const inStock = product.stock > 0n;
-              return (
-                <Card
-                  key={String(product.id)}
-                  data-ocid={`shop.product.card.${idx + 1}`}
-                  className="overflow-hidden border-0 shadow-card"
-                  style={{ backgroundColor: "#ffffff" }}
-                >
-                  <div className="relative">
-                    {product.imageId ? (
-                      <img
-                        src={product.imageId}
-                        alt={product.name}
-                        className="w-full h-32 object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "/assets/generated/kaccha-tomatoes.dim_400x400.jpg";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-32 bg-lime-100 flex items-center justify-center">
-                        <span className="text-4xl">🥬</span>
-                      </div>
-                    )}
-                    {!inStock && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <Badge variant="destructive">Out of Stock</Badge>
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-2.5 space-y-2">
-                    <p className="font-bold text-sm text-foreground leading-tight">
-                      {product.name}
-                    </p>
-                    <p
-                      className="font-extrabold text-base"
-                      style={{ color: "#15803d" }}
-                    >
-                      ₹{String(price)}
-                      <span className="text-xs font-bold text-muted-foreground ml-1">
-                        ({weight}) — ₹{String(product.price)}/kg
-                      </span>
-                    </p>
-                    <Select
-                      value={selectedWeights[String(product.id)] ?? "1kg"}
-                      onValueChange={(val) =>
-                        setSelectedWeights((prev) => ({
-                          ...prev,
-                          [String(product.id)]: val,
-                        }))
-                      }
-                    >
-                      <SelectTrigger
-                        data-ocid={`shop.product.select.${idx + 1}`}
-                        className="h-8 text-xs font-bold border-border"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WEIGHT_OPTIONS.map((w) => (
-                          <SelectItem key={w} value={w} className="font-bold">
-                            {w}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      data-ocid={`shop.product.button.${idx + 1}`}
-                      size="sm"
-                      className="w-full h-8 text-xs font-bold"
-                      style={{ backgroundColor: "#f97316", color: "white" }}
-                      disabled={!inStock}
-                      onClick={() => handleAddToKart(product)}
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5 mr-1" />
-                      Add to Kart
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* Discount Banner */}
+      {discount && discount.percentage > 0 && (
+        <div className="flex items-center gap-2 bg-accent/20 border border-accent/40 rounded-lg px-3 py-2">
+          <Tag className="w-4 h-4 text-accent-foreground shrink-0" />
+          <span className="text-xs font-bold text-accent-foreground">
+            🎉 {discount.percentage}% OFF on orders above ₹
+            {discount.minimumAmount}
+          </span>
+        </div>
+      )}
+
+      {/* Products Grid */}
+      {isLoading ? (
+        <div data-ocid="shop.loading_state" className="grid grid-cols-2 gap-3">
+          {["s1", "s2", "s3", "s4", "s5", "s6"].map((k) => (
+            <div key={k} className="bg-card rounded-xl overflow-hidden">
+              <Skeleton className="aspect-square w-full" />
+              <div className="p-3 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div
+          data-ocid="shop.empty_state"
+          className="flex flex-col items-center py-16 gap-3"
+        >
+          <span className="text-5xl">🛒</span>
+          <p className="text-muted-foreground font-medium text-sm">
+            {search
+              ? "No products match your search"
+              : "No products available yet"}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {filtered.map((product: Product, idx: number) => (
+            <div
+              key={product.id.toString()}
+              data-ocid={`shop.product.item.${idx + 1}`}
+            >
+              <ProductCard product={product} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
-      <footer className="text-center py-6 text-xs text-muted-foreground px-4">
-        © {new Date().getFullYear()}. Built with ❤️ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline"
-        >
-          caffeine.ai
-        </a>
+      <footer className="text-center py-4">
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()}.{" "}
+          <a
+            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Built with love using caffeine.ai
+          </a>
+        </p>
       </footer>
     </div>
   );

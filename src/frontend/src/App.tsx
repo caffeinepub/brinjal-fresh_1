@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
-import { Leaf, Settings, ShoppingBag, ShoppingCart } from "lucide-react";
+import { Settings, ShoppingBag, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { KartProvider, useKart } from "./context/KartContext";
 import AdminPage from "./pages/AdminPage";
@@ -14,43 +14,26 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header
-        className="sticky top-0 z-40 shadow-md"
-        style={{ backgroundColor: "#4d7c0f" }}
-      >
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Leaf className="w-6 h-6 text-lime-200" />
-            <h1 className="font-display text-xl font-bold text-white tracking-tight">
-              Brinjal<span className="opacity-80">.fresh</span>
-            </h1>
-          </div>
-          <button
-            type="button"
-            data-ocid="nav.kart.tab"
-            onClick={() => setActiveTab("kart")}
-            className="relative p-2 text-white"
-          >
-            <ShoppingCart className="w-6 h-6" />
-            {totalItems > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-orange-400 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {totalItems > 9 ? "9+" : totalItems}
-              </span>
-            )}
-          </button>
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-primary shadow-card">
+        <div className="flex items-center justify-center gap-2 px-4 py-3">
+          <span className="text-2xl">🥦</span>
+          <h1 className="font-display text-xl font-bold text-primary-foreground tracking-tight">
+            Brinjal<span className="opacity-80">.fresh</span>
+          </h1>
         </div>
       </header>
 
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto bottom-safe">
         {activeTab === "shop" && <ShopPage />}
-        {activeTab === "kart" && (
-          <KartPage onBackToShop={() => setActiveTab("shop")} />
-        )}
+        {activeTab === "kart" && <KartPage />}
         {activeTab === "admin" && <AdminPage />}
       </main>
 
+      {/* Bottom Navigation */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-orange-700/30"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-orange-600/30 shadow-card-lg"
         style={{ backgroundColor: "#f97316" }}
       >
         <div className="flex items-stretch">
@@ -65,12 +48,12 @@ function AppContent() {
             }`}
           >
             <ShoppingBag className="w-5 h-5" />
-            <span className="text-xs font-bold">Shop</span>
+            <span className="text-xs font-display font-semibold">Shop</span>
           </button>
 
           <button
             type="button"
-            data-ocid="nav.kart.bottom.tab"
+            data-ocid="nav.kart.tab"
             onClick={() => setActiveTab("kart")}
             className={`flex-1 flex flex-col items-center gap-0.5 py-3 px-2 relative transition-colors ${
               activeTab === "kart"
@@ -86,7 +69,7 @@ function AppContent() {
                 </span>
               )}
             </div>
-            <span className="text-xs font-bold">Kart</span>
+            <span className="text-xs font-display font-semibold">Kart</span>
           </button>
 
           <button
@@ -100,7 +83,7 @@ function AppContent() {
             }`}
           >
             <Settings className="w-5 h-5" />
-            <span className="text-xs font-bold">Admin</span>
+            <span className="text-xs font-display font-semibold">Admin</span>
           </button>
         </div>
       </nav>
