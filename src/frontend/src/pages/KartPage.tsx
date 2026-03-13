@@ -1,80 +1,73 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Leaf, Loader2, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { Loader2, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useKart } from "../context/KartContext";
 import { useDiscount, usePlaceOrder } from "../hooks/useQueries";
 
-export default function KartPage() {
-  const { items, updateQuantity, removeFromKart, clearKart, totalAmount } =
+function parseDiscount(
+  discountText: string,
+): { pct: number; minOrder: number } | null {
+  if (!discountText) return null;
+  const parts = discountText.split("|");
+  if (parts.length === 2) {
+    const pct = Number.parseFloat(parts[0]);
+    const minOrder = Number.parseFloat(parts[1]);
+    if (!Number.isNaN(pct) && pct > 0 && !Number.isNaN(minOrder))
+      return { pct, minOrder };
+  }
+  return null;
+}
+
+interface KartPageProps {
+  onBackToShop: () => void;
+}
+
+export default function KartPage({ onBackToShop }: KartPageProps) {
+  const { items, removeFromKart, updateQuantity, clearKart, totalAmount } =
     useKart();
-  const { data: discountRaw } = useDiscount();
-
-  const discountInfo = (() => {
-    if (!discountRaw) return null;
-    const parts = discountRaw.split("|");
-    if (parts.length !== 2) return null;
-    const pct = Number(parts[0]);
-    const minOrder = Number(parts[1]);
-    if (Number.isNaN(pct) || Number.isNaN(minOrder) || pct <= 0) return null;
-    return { pct, minOrder: BigInt(Math.round(minOrder)) };
-  })();
-
-  const discountAmount =
-    discountInfo && totalAmount >= discountInfo.minOrder
-      ? BigInt(Math.floor((Number(totalAmount) * discountInfo.pct) / 100))
-      : BigInt(0);
-
-  const finalTotal = totalAmount - discountAmount;
-
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    payment: "Cash on Delivery",
-  });
-  const [orderSuccess, setOrderSuccess] = useState(false);
+  const { data: discountText } = useDiscount();
   const placeOrder = usePlaceOrder();
 
-  const handleCheckout = async () => {
-    if (!form.name.trim() || !form.phone.trim() || !form.address.trim()) {
-      toast.error("Please fill in all fields.");
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [payment, setPayment] = useState("Cash on Delivery");
+  const [orderSuccess, setOrderSuccess] = useState(false);
+
+  const discount = parseDiscount(discountText ?? "");
+  const subtotal = Number(totalAmount);
+  const discountAmount =
+    discount && subtotal >= discount.minOrder
+      ? Math.floor((subtotal * discount.pct) / 100)
+      : 0;
+  const total = subtotal - discountAmount;
+
+  const handlePlaceOrder = async () => {
+    if (!name.trim() || !phone.trim() || !address.trim()) {
+      toast.error("Please fill in all fields");
       return;
     }
     try {
       await placeOrder.mutateAsync({
-        customerName: form.name,
-        customerPhone: form.phone,
-        customerAddress: form.address,
-        paymentMethod: form.payment,
-        items: items.map((i) => ({
-          productId: i.product.id,
-          productName: `${i.product.name} (${i.weightOption})`,
-          quantity: BigInt(i.quantity),
-          price: i.pricePerUnit,
+        customerName: name.trim(),
+        customerPhone: phone.trim(),
+        customerAddress: address.trim(),
+        paymentMethod: payment,
+        items: items.map((item) => ({
+          productId: item.product.id,
+          productName: item.product.name,
+          quantity: BigInt(item.quantity),
+          price: item.pricePerUnit,
         })),
       });
       clearKart();
-      setCheckoutOpen(false);
       setOrderSuccess(true);
-      setForm({
-        name: "",
-        phone: "",
-        address: "",
-        payment: "Cash on Delivery",
-      });
-      toast.success("Order placed successfully! 🎉");
+      setShowCheckout(false);
     } catch {
       toast.error("Failed to place order. Please try again.");
     }
@@ -84,22 +77,22 @@ export default function KartPage() {
     return (
       <div
         data-ocid="kart.success_state"
-        className="flex flex-col items-center justify-center py-20 gap-4 text-center px-6 animate-fade-up"
+        className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center"
       >
-        <div className="w-20 h-20 bg-primary/15 rounded-full flex items-center justify-center">
-          <Leaf className="w-10 h-10 text-primary" />
-        </div>
-        <h2 className="font-display text-2xl font-bold text-foreground">
-          Order Placed! 🎉
+        <div className="text-6xl mb-4">🎉</div>
+        <h2 className="text-2xl font-bold text-foreground mb-2">
+          Order Placed!
         </h2>
-        <p className="text-muted-foreground max-w-xs">
-          Your fresh vegetables are on their way. Thank you for shopping with
-          Brinjal.fresh!
+        <p className="text-muted-foreground mb-6">
+          Your fresh vegetables are on the way.
         </p>
         <Button
-          onClick={() => setOrderSuccess(false)}
-          className="mt-2"
-          data-ocid="kart.continue.button"
+          data-ocid="kart.shop.button"
+          style={{ backgroundColor: "#f97316", color: "white" }}
+          onClick={() => {
+            setOrderSuccess(false);
+            onBackToShop();
+          }}
         >
           Continue Shopping
         </Button>
@@ -111,51 +104,56 @@ export default function KartPage() {
     return (
       <div
         data-ocid="kart.empty_state"
-        className="flex flex-col items-center justify-center py-20 gap-4 text-center px-6"
+        className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center"
       >
-        <div className="w-16 h-16 bg-card rounded-full flex items-center justify-center shadow-card">
-          <ShoppingCart className="w-8 h-8 text-primary/40" />
-        </div>
-        <p className="font-display font-bold text-foreground text-lg">
+        <ShoppingCart className="w-16 h-16 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-bold text-foreground mb-2">
           Your kart is empty
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Add fresh vegetables from the shop to get started.
-        </p>
+        </h2>
+        <p className="text-muted-foreground mb-6">Add some fresh vegetables!</p>
+        <Button
+          data-ocid="kart.go_shopping.button"
+          style={{ backgroundColor: "#f97316", color: "white" }}
+          onClick={onBackToShop}
+        >
+          Go Shopping
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col px-4 py-4 gap-4">
-      <h2 className="font-display text-xl font-bold text-foreground">
-        My Kart
-      </h2>
+    <div className="px-3 py-4 space-y-3">
+      <h2 className="text-lg font-bold text-foreground">Your Kart</h2>
 
-      <div data-ocid="kart.list" className="flex flex-col gap-3">
+      {/* Items */}
+      <div className="space-y-2">
         {items.map((item, idx) => (
           <div
-            key={`${item.product.id.toString()}-${item.weightOption}`}
+            key={`${String(item.product.id)}-${item.weightOption}`}
             data-ocid={`kart.item.${idx + 1}`}
-            className="bg-card rounded-lg shadow-card p-3 flex items-center gap-3 animate-fade-up"
-            style={{ animationDelay: `${idx * 50}ms` }}
+            className="flex items-center gap-3 bg-card rounded-xl p-3 shadow-card"
           >
             <div className="flex-1 min-w-0">
-              <p className="font-display font-semibold text-sm text-card-foreground truncate">
+              <p className="font-bold text-sm text-foreground truncate">
                 {item.product.name}
               </p>
-              <p className="text-xs text-primary font-semibold">
+              <p className="text-xs text-muted-foreground">
                 {item.weightOption}
               </p>
-              <p className="text-xs text-muted-foreground">
-                ₹{item.pricePerUnit.toString()} per {item.weightOption}
+              <p
+                className="font-extrabold text-sm"
+                style={{ color: "#15803d" }}
+              >
+                ₹{String(item.pricePerUnit)} × {item.quantity} = ₹
+                {String(item.pricePerUnit * BigInt(item.quantity))}
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
+              <button
+                type="button"
+                data-ocid={`kart.item.${idx + 1}.toggle`}
+                className="w-7 h-7 rounded-full bg-lime-200 flex items-center justify-center"
                 onClick={() =>
                   updateQuantity(
                     item.product.id,
@@ -163,17 +161,16 @@ export default function KartPage() {
                     item.quantity - 1,
                   )
                 }
-                data-ocid={`kart.item.button.${idx + 1}`}
               >
-                <Minus className="w-3 h-3" />
-              </Button>
-              <span className="w-7 text-center font-bold text-sm">
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="w-6 text-center font-bold text-sm">
                 {item.quantity}
               </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
+              <button
+                type="button"
+                data-ocid={`kart.item.${idx + 1}.toggle`}
+                className="w-7 h-7 rounded-full bg-lime-200 flex items-center justify-center"
                 onClick={() =>
                   updateQuantity(
                     item.product.id,
@@ -181,194 +178,170 @@ export default function KartPage() {
                     item.quantity + 1,
                   )
                 }
-                data-ocid={`kart.item.button.${idx + 1}`}
               >
-                <Plus className="w-3 h-3" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="font-bold text-sm text-primary">
-                ₹{(item.pricePerUnit * BigInt(item.quantity)).toString()}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-destructive hover:text-destructive"
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                data-ocid={`kart.item.${idx + 1}.delete_button`}
+                className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center ml-1"
                 onClick={() =>
                   removeFromKart(item.product.id, item.weightOption)
                 }
-                data-ocid={`kart.delete_button.${idx + 1}`}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="bg-card rounded-lg shadow-card p-4 space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Subtotal</span>
-          <span className="font-medium text-foreground">
-            ₹{totalAmount.toString()}
-          </span>
-        </div>
-        {discountAmount > BigInt(0) && discountInfo && (
-          <div className="flex justify-between text-sm">
-            <span className="text-green-600 font-semibold">
-              Discount ({discountInfo.pct}%)
-            </span>
-            <span className="text-green-600 font-bold">
-              -₹{discountAmount.toString()}
-            </span>
+      {/* Price breakdown */}
+      <div className="bg-card rounded-xl p-4 shadow-card space-y-1">
+        {discountAmount > 0 ? (
+          <>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-semibold">₹{subtotal}</span>
+            </div>
+            <div className="flex justify-between text-sm text-green-700">
+              <span>Discount ({discount?.pct}%)</span>
+              <span className="font-semibold">−₹{discountAmount}</span>
+            </div>
+            <div className="flex justify-between font-extrabold text-base border-t border-border pt-2 mt-2">
+              <span>Total</span>
+              <span style={{ color: "#15803d" }}>₹{total}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-between font-extrabold text-base">
+            <span>Total</span>
+            <span style={{ color: "#15803d" }}>₹{subtotal}</span>
           </div>
         )}
-        {discountInfo && totalAmount < discountInfo.minOrder && (
-          <p className="text-xs text-muted-foreground">
-            Add ₹{(discountInfo.minOrder - totalAmount).toString()} more to get{" "}
-            {discountInfo.pct}% off!
+        {discount && discountAmount === 0 && (
+          <p className="text-xs text-orange-600 font-semibold mt-1">
+            Add ₹{discount.minOrder - subtotal} more to get {discount.pct}% off!
           </p>
         )}
-        <div className="flex items-center justify-between pt-1 border-t border-border">
-          <div>
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="font-display text-xl font-bold text-primary">
-              ₹{finalTotal.toString()}
-            </p>
-          </div>
-          <Button
-            onClick={() => setCheckoutOpen(true)}
-            data-ocid="kart.checkout.button"
-            className="px-6"
-          >
-            Checkout
-          </Button>
-        </div>
       </div>
 
-      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent
-          data-ocid="kart.checkout.dialog"
-          className="max-w-sm mx-auto"
+      {/* Checkout */}
+      {!showCheckout ? (
+        <Button
+          data-ocid="kart.checkout.button"
+          className="w-full font-bold text-base py-6"
+          style={{ backgroundColor: "#f97316", color: "white" }}
+          onClick={() => setShowCheckout(true)}
         >
-          <DialogHeader>
-            <DialogTitle className="font-display">
-              Complete Your Order
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="c-name">Full Name</Label>
+          Proceed to Checkout
+        </Button>
+      ) : (
+        <div
+          data-ocid="kart.checkout.panel"
+          className="bg-card rounded-xl p-4 shadow-card space-y-4"
+        >
+          <h3 className="font-bold text-foreground">Delivery Details</h3>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="cust-name" className="font-bold">
+                Name
+              </Label>
               <Input
-                id="c-name"
+                id="cust-name"
                 data-ocid="kart.checkout.input"
                 placeholder="Your full name"
-                value={form.name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
-                }
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-phone">Phone Number</Label>
+            <div>
+              <Label htmlFor="cust-phone" className="font-bold">
+                Phone
+              </Label>
               <Input
-                id="c-phone"
+                id="cust-phone"
                 data-ocid="kart.checkout.input"
-                placeholder="10-digit phone number"
                 type="tel"
-                value={form.phone}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, phone: e.target.value }))
-                }
+                placeholder="10-digit mobile number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="mt-1"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-address">Delivery Address</Label>
-              <Input
-                id="c-address"
-                data-ocid="kart.checkout.input"
-                placeholder="Full address"
-                value={form.address}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, address: e.target.value }))
-                }
+            <div>
+              <Label htmlFor="cust-address" className="font-bold">
+                Delivery Address
+              </Label>
+              <textarea
+                id="cust-address"
+                data-ocid="kart.checkout.textarea"
+                placeholder="Street, Area, City..."
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Payment Method</Label>
+            <div>
+              <Label className="font-bold mb-2 block">Payment Method</Label>
               <RadioGroup
-                value={form.payment}
-                onValueChange={(v) => setForm((f) => ({ ...f, payment: v }))}
+                value={payment}
+                onValueChange={setPayment}
                 className="space-y-2"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <RadioGroupItem
                     value="Cash on Delivery"
                     id="cod"
                     data-ocid="kart.checkout.radio"
                   />
-                  <Label htmlFor="cod" className="cursor-pointer">
+                  <Label htmlFor="cod" className="font-semibold cursor-pointer">
                     Cash on Delivery
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <RadioGroupItem
                     value="Online Payment on Delivery"
-                    id="opd"
+                    id="online"
                     data-ocid="kart.checkout.radio"
                   />
-                  <Label htmlFor="opd" className="cursor-pointer">
+                  <Label
+                    htmlFor="online"
+                    className="font-semibold cursor-pointer"
+                  >
                     Online Payment on Delivery
                   </Label>
                 </div>
               </RadioGroup>
             </div>
-            <div className="bg-muted rounded-md p-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="text-foreground">
-                  ₹{totalAmount.toString()}
-                </span>
-              </div>
-              {discountAmount > BigInt(0) && discountInfo && (
-                <div className="flex justify-between">
-                  <span className="text-green-600 font-semibold">
-                    Discount ({discountInfo.pct}%)
-                  </span>
-                  <span className="text-green-600 font-bold">
-                    -₹{discountAmount.toString()}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold border-t border-border pt-1">
-                <span className="text-foreground">Total</span>
-                <span className="text-foreground">
-                  ₹{finalTotal.toString()}
-                </span>
-              </div>
-            </div>
           </div>
-          <DialogFooter className="gap-2">
+          <div className="flex gap-2">
             <Button
-              variant="outline"
-              onClick={() => setCheckoutOpen(false)}
               data-ocid="kart.checkout.cancel_button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowCheckout(false)}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleCheckout}
-              disabled={placeOrder.isPending}
               data-ocid="kart.checkout.submit_button"
+              className="flex-1 font-bold"
+              style={{ backgroundColor: "#f97316", color: "white" }}
+              disabled={placeOrder.isPending}
+              onClick={handlePlaceOrder}
             >
-              {placeOrder.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {placeOrder.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Place Order"
               )}
-              {placeOrder.isPending ? "Placing..." : "Place Order"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

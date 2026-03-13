@@ -49,6 +49,12 @@ export const Product = IDL.Record({
   'imageId' : IDL.Text,
   'price' : IDL.Nat,
 });
+export const Feedback = IDL.Record({
+  'id' : IDL.Nat,
+  'customerName' : IDL.Text,
+  'message' : IDL.Text,
+  'createdAt' : IDL.Int,
+});
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -84,10 +90,12 @@ export const idlService = IDL.Service({
       [],
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'deleteOrder' : IDL.Func([IDL.Nat], [], []),
   'deleteProduct' : IDL.Func([IDL.Nat], [], []),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getDeliveryTiming' : IDL.Func([], [IDL.Text], ['query']),
   'getDiscount' : IDL.Func([], [IDL.Text], ['query']),
+  'getFeedbacks' : IDL.Func([], [IDL.Vec(Feedback)], ['query']),
   'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getProduct' : IDL.Func([IDL.Nat], [Product], ['query']),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
@@ -99,6 +107,7 @@ export const idlService = IDL.Service({
     ),
   'setDeliveryTiming' : IDL.Func([IDL.Text], [], []),
   'setDiscount' : IDL.Func([IDL.Text], [], []),
+  'submitFeedback' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
   'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'updateProduct' : IDL.Func(
       [IDL.Nat, IDL.Text, IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
@@ -151,6 +160,12 @@ export const idlFactory = ({ IDL }) => {
     'imageId' : IDL.Text,
     'price' : IDL.Nat,
   });
+  const Feedback = IDL.Record({
+    'id' : IDL.Nat,
+    'customerName' : IDL.Text,
+    'message' : IDL.Text,
+    'createdAt' : IDL.Int,
+  });
   
   return IDL.Service({
     '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -186,10 +201,12 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'deleteOrder' : IDL.Func([IDL.Nat], [], []),
     'deleteProduct' : IDL.Func([IDL.Nat], [], []),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getDeliveryTiming' : IDL.Func([], [IDL.Text], ['query']),
     'getDiscount' : IDL.Func([], [IDL.Text], ['query']),
+    'getFeedbacks' : IDL.Func([], [IDL.Vec(Feedback)], ['query']),
     'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getProduct' : IDL.Func([IDL.Nat], [Product], ['query']),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
@@ -201,6 +218,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'setDeliveryTiming' : IDL.Func([IDL.Text], [], []),
     'setDiscount' : IDL.Func([IDL.Text], [], []),
+    'submitFeedback' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
     'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'updateProduct' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],

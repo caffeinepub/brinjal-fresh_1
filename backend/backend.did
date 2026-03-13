@@ -1,0 +1,45 @@
+type Product = record {
+  id: nat;
+  name: text;
+  pricePerKg: nat;
+  stock: nat;
+  imageUrl: text;
+};
+
+type OrderItem = record {
+  productId: nat;
+  productName: text;
+  quantity: text;
+  priceAtOrder: nat;
+};
+
+type CustomerOrder = record {
+  id: nat;
+  customerName: text;
+  phone: text;
+  address: text;
+  items: vec OrderItem;
+  paymentMethod: text;
+  status: text;
+  createdAt: int;
+};
+
+type Result_nat = variant { ok: nat; err: text };
+type Result_unit = variant { ok; err: text };
+type Result_orders = variant { ok: vec CustomerOrder; err: text };
+
+service : {
+  checkAdmin: (text) -> (bool) query;
+  getProducts: () -> (vec Product) query;
+  addProduct: (text, nat, nat, text, text) -> (Result_nat);
+  updateProduct: (nat, text, nat, nat, text, text) -> (Result_unit);
+  deleteProduct: (nat, text) -> (Result_unit);
+  placeOrder: (text, text, text, vec OrderItem, text) -> (nat);
+  getOrders: (text) -> (Result_orders) query;
+  updateOrderStatus: (nat, text, text) -> (Result_unit);
+  deleteOrder: (nat, text) -> (Result_unit);
+  setDeliveryTiming: (text, text) -> (Result_unit);
+  getDeliveryTiming: () -> (text) query;
+  setDiscount: (nat, nat, text) -> (Result_unit);
+  getDiscount: () -> (nat, nat) query;
+};

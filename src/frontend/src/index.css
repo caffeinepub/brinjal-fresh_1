@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("/assets/fonts/Fraunces.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    /* Lime green theme */
+    --background: 0.92 0.08 135;
+    --foreground: 0.22 0.06 145;
+    --card: 0.97 0.03 120;
+    --card-foreground: 0.22 0.06 145;
+    --popover: 0.97 0.03 120;
+    --popover-foreground: 0.22 0.06 145;
+    --primary: 0.7 0.2 140;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.88 0.1 135;
+    --secondary-foreground: 0.22 0.06 145;
+    --muted: 0.88 0.06 130;
+    --muted-foreground: 0.45 0.07 140;
+    --accent: 0.72 0.18 55;
+    --accent-foreground: 1 0 0;
+    --destructive: 0.55 0.2 25;
+    --destructive-foreground: 1 0 0;
+    --border: 0.82 0.1 135;
+    --input: 0.82 0.1 135;
+    --ring: 0.7 0.2 140;
+    --radius: 0.75rem;
+    --chart-1: 0.7 0.2 140;
+    --chart-2: 0.72 0.18 55;
+    --chart-3: 0.55 0.2 25;
+    --chart-4: 0.65 0.15 200;
+    --chart-5: 0.6 0.18 320;
+    --sidebar: 0.92 0.08 135;
+    --sidebar-foreground: 0.22 0.06 145;
+    --sidebar-primary: 0.7 0.2 140;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.88 0.1 135;
+    --sidebar-accent-foreground: 0.22 0.06 145;
+    --sidebar-border: 0.82 0.1 135;
+    --sidebar-ring: 0.7 0.2 140;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.bottom-safe {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}

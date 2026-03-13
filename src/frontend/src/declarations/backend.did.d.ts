@@ -10,6 +10,12 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Feedback {
+  'id' : bigint,
+  'customerName' : string,
+  'message' : string,
+  'createdAt' : bigint,
+}
 export interface Order {
   'id' : bigint,
   'customerName' : string,
@@ -68,10 +74,12 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addProduct' : ActorMethod<[string, bigint, bigint, string, string], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'deleteOrder' : ActorMethod<[bigint], undefined>,
   'deleteProduct' : ActorMethod<[bigint], undefined>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getDeliveryTiming' : ActorMethod<[], string>,
   'getDiscount' : ActorMethod<[], string>,
+  'getFeedbacks' : ActorMethod<[], Array<Feedback>>,
   'getOrders' : ActorMethod<[], Array<Order>>,
   'getProduct' : ActorMethod<[bigint], Product>,
   'getProducts' : ActorMethod<[], Array<Product>>,
@@ -82,6 +90,7 @@ export interface _SERVICE {
   >,
   'setDeliveryTiming' : ActorMethod<[string], undefined>,
   'setDiscount' : ActorMethod<[string], undefined>,
+  'submitFeedback' : ActorMethod<[string, string], bigint>,
   'updateOrderStatus' : ActorMethod<[bigint, string], undefined>,
   'updateProduct' : ActorMethod<
     [bigint, string, bigint, bigint, string, string],
