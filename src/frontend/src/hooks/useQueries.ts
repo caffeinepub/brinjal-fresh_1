@@ -178,11 +178,7 @@ export function useDeleteOrder() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
-      // deleteOrder may be available in the deployed backend
-      const a = actor as any;
-      if (typeof a.deleteOrder === "function") {
-        return a.deleteOrder(id);
-      }
+      return actor.deleteOrder(id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
