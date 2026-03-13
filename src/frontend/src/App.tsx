@@ -1,12 +1,19 @@
 import { Toaster } from "@/components/ui/sonner";
-import { Leaf, Settings, ShoppingBag, ShoppingCart } from "lucide-react";
+import {
+  Leaf,
+  MessageSquare,
+  Settings,
+  ShoppingBag,
+  ShoppingCart,
+} from "lucide-react";
 import { useState } from "react";
 import { KartProvider, useKart } from "./context/KartContext";
 import AdminPage from "./pages/AdminPage";
+import FeedbackPage from "./pages/FeedbackPage";
 import KartPage from "./pages/KartPage";
 import ShopPage from "./pages/ShopPage";
 
-type Tab = "shop" | "kart" | "admin";
+type Tab = "shop" | "kart" | "admin" | "feedback";
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>("shop");
@@ -29,6 +36,7 @@ function AppContent() {
         {activeTab === "shop" && <ShopPage />}
         {activeTab === "kart" && <KartPage />}
         {activeTab === "admin" && <AdminPage />}
+        {activeTab === "feedback" && <FeedbackPage />}
       </main>
 
       {/* Bottom Navigation */}
@@ -84,6 +92,20 @@ function AppContent() {
           >
             <Settings className="w-5 h-5" />
             <span className="text-xs font-display font-semibold">Admin</span>
+          </button>
+
+          <button
+            type="button"
+            data-ocid="nav.feedback.tab"
+            onClick={() => setActiveTab("feedback")}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-3 px-2 transition-colors ${
+              activeTab === "feedback"
+                ? "text-white bg-white/20"
+                : "text-white/80 hover:text-white"
+            }`}
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-xs font-display font-semibold">Feedback</span>
           </button>
         </div>
       </nav>
