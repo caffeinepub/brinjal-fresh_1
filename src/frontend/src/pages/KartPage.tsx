@@ -26,12 +26,20 @@ export default function KartPage() {
   const subtotal = Number(totalAmount);
 
   let discountAmount = 0;
+  let discountLabel = "";
   if (
     discount &&
     discount.percentage > 0 &&
     subtotal >= discount.minimumAmount
   ) {
     discountAmount = Math.round((subtotal * discount.percentage) / 100);
+    discountLabel = `${discount.percentage}% off`;
+  }
+  if (discount && discount.flatAmount > 0 && subtotal >= discount.flatMinimum) {
+    if (discount.flatAmount > discountAmount) {
+      discountAmount = discount.flatAmount;
+      discountLabel = `₹${discount.flatAmount} off`;
+    }
   }
   const finalTotal = subtotal - discountAmount;
 
@@ -61,7 +69,8 @@ export default function KartPage() {
         paymentMethod: payment,
         items: items.map((item) => ({
           productId: item.product.id,
-          productName: item.product.name,
+          // Encode quantityOption into productName so admin can display it
+          productName: `${item.product.name} [${item.quantityOption}]`,
           quantity: BigInt(item.quantity),
           price: item.itemPrice,
         })),
@@ -198,15 +207,25 @@ export default function KartPage() {
         </div>
         {discountAmount > 0 && (
           <div className="flex justify-between text-sm text-green-700">
-            <span>Discount ({discount?.percentage}%)</span>
+            <span>Discount ({discountLabel})</span>
             <span>-₹{discountAmount}</span>
           </div>
         )}
-        {discount && discount.percentage > 0 && discountAmount === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Add ₹{discount.minimumAmount - subtotal} more for{" "}
-            {discount.percentage}% off
-          </p>
+        {discount && discountAmount === 0 && (
+          <>
+            {discount.percentage > 0 && subtotal < discount.minimumAmount && (
+              <p className="text-xs text-muted-foreground">
+                Add ₹{discount.minimumAmount - subtotal} more for{" "}
+                {discount.percentage}% off
+              </p>
+            )}
+            {discount.flatAmount > 0 && subtotal < discount.flatMinimum && (
+              <p className="text-xs text-muted-foreground">
+                Add ₹{discount.flatMinimum - subtotal} more for ₹
+                {discount.flatAmount} off
+              </p>
+            )}
+          </>
         )}
         <Separator />
         <div className="flex justify-between font-bold">

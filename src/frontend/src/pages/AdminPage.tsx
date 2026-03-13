@@ -78,6 +78,39 @@ const PRICE_LABELS: Record<UnitType, string> = {
   packet: "Price per packet (₹)",
 };
 
+/** Encode/decode name + description as "name|description" */
+function encodeName(name: string, description: string): string {
+  if (!description.trim()) return name.trim();
+  return `${name.trim()}|${description.trim()}`;
+}
+function decodeName(raw: string): { name: string; description: string } {
+  const idx = raw.indexOf("|");
+  if (idx === -1) return { name: raw, description: "" };
+  return {
+    name: raw.slice(0, idx).trim(),
+    description: raw.slice(idx + 1).trim(),
+  };
+}
+
+/**
+ * Parse an order item's productName.
+ * productName is stored as: "name|description [quantityOption]"
+ * Returns { displayName, quantityLabel }
+ */
+function parseOrderItemName(productName: string): {
+  displayName: string;
+  quantityLabel: string;
+} {
+  // Extract [quantityOption] from end, e.g. " [250gm]" or " [1 Piece]"
+  const match = productName.match(/\s*\[([^\]]+)\]$/);
+  const quantityLabel = match ? match[1] : "";
+  const rawName = match
+    ? productName.slice(0, productName.length - match[0].length)
+    : productName;
+  const { name } = decodeName(rawName);
+  return { displayName: name, quantityLabel };
+}
+
 // ─── Password Gate ────────────────────────────────────────────────────────────
 function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
   const [pwd, setPwd] = useState("");
@@ -183,6 +216,7 @@ function ProductThumb({ imageId }: { imageId: string }) {
 // ─── Product Form ─────────────────────────────────────────────────────────────
 interface ProductFormData {
   name: string;
+  description: string;
   unitType: UnitType;
   price: string;
   stock: string;
@@ -191,6 +225,7 @@ interface ProductFormData {
 
 const defaultForm = (): ProductFormData => ({
   name: "",
+  description: "",
   unitType: "kg",
   price: "",
   stock: "",
@@ -239,6 +274,22 @@ function ProductForm({
           placeholder="e.g. Fresh Tomatoes"
           value={form.name}
           onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">
+          Short Description{" "}
+          <span className="font-normal text-muted-foreground">(optional)</span>
+        </Label>
+        <Input
+          data-ocid="admin.products.input"
+          placeholder="e.g. Fresh red tomato"
+          value={form.description}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, description: e.target.value }))
+          }
+          maxLength={60}
         />
       </div>
 
@@ -367,7 +418,7 @@ function ProductsTab() {
     }
     try {
       await addProduct.mutateAsync({
-        name: data.name,
+        name: encodeName(data.name, data.description),
         price: BigInt(Math.round(Number(data.price))),
         stock: BigInt(Math.round(Number(data.stock))),
         imageId: data.imageId,
@@ -385,7 +436,7 @@ function ProductsTab() {
     try {
       await updateProduct.mutateAsync({
         id: editProduct.id,
-        name: data.name,
+        name: encodeName(data.name, data.description),
         price: BigInt(Math.round(Number(data.price))),
         stock: BigInt(Math.round(Number(data.stock))),
         imageId: data.imageId,
@@ -434,7 +485,7 @@ function ProductsTab() {
           {editProduct && (
             <ProductForm
               initial={{
-                name: editProduct.name,
+                ...decodeName(editProduct.name),
                 unitType: (editProduct.category as UnitType) || "kg",
                 price: String(Number(editProduct.price)),
                 stock: String(Number(editProduct.stock)),
@@ -466,71 +517,79 @@ function ProductsTab() {
         </div>
       ) : (
         <div className="space-y-2">
-          {products.map((product: Product, idx: number) => (
-            <div
-              key={product.id.toString()}
-              data-ocid={`admin.products.item.${idx + 1}`}
-              className="bg-card rounded-xl p-3 flex items-center gap-3 shadow-xs"
-            >
-              <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0">
-                <ProductThumb imageId={product.imageId} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-display font-bold text-sm truncate">
-                  {product.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  ₹{Number(product.price)}/{product.category || "kg"} • Stock:{" "}
-                  {Number(product.stock)}
-                </p>
-              </div>
-              <div className="flex gap-1.5">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  data-ocid={`admin.products.edit_button.${idx + 1}`}
-                  className="w-8 h-8"
-                  onClick={() => setEditProduct(product)}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      data-ocid={`admin.products.delete_button.${idx + 1}`}
-                      className="w-8 h-8"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete "{product.name}"?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel data-ocid="admin.products.cancel_button">
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        data-ocid="admin.products.confirm_button"
-                        onClick={() => {
-                          deleteProduct.mutate(product.id);
-                          toast.success("Product deleted");
-                        }}
+          {products.map((product: Product, idx: number) => {
+            const { name, description } = decodeName(product.name);
+            return (
+              <div
+                key={product.id.toString()}
+                data-ocid={`admin.products.item.${idx + 1}`}
+                className="bg-card rounded-xl p-3 flex items-center gap-3 shadow-xs"
+              >
+                <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0">
+                  <ProductThumb imageId={product.imageId} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-display font-bold text-sm truncate">
+                    {name}
+                  </p>
+                  {description && (
+                    <p className="text-xs text-muted-foreground italic truncate">
+                      {description}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    ₹{Number(product.price)}/{product.category || "kg"} • Stock:{" "}
+                    {Number(product.stock)}
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    data-ocid={`admin.products.edit_button.${idx + 1}`}
+                    className="w-8 h-8"
+                    onClick={() => setEditProduct(product)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        data-ocid={`admin.products.delete_button.${idx + 1}`}
+                        className="w-8 h-8"
                       >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{name}"?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-ocid="admin.products.cancel_button">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          data-ocid="admin.products.confirm_button"
+                          onClick={() => {
+                            deleteProduct.mutate(product.id);
+                            toast.success("Product deleted");
+                          }}
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -593,15 +652,32 @@ function OrderCard({ order, idx }: { order: Order; idx: number }) {
         {order.customerAddress}
       </div>
 
-      <div className="space-y-0.5">
-        {order.items.map((item) => (
-          <p
-            key={`${String(item.productId)}-${item.productName}`}
-            className="text-xs"
-          >
-            {item.productName} × {Number(item.quantity)} — ₹{Number(item.price)}
-          </p>
-        ))}
+      {/* Order items -- show product name, quantity label (e.g. 250gm), count, and price */}
+      <div className="space-y-1">
+        {order.items.map((item) => {
+          const { displayName, quantityLabel } = parseOrderItemName(
+            item.productName,
+          );
+          return (
+            <div
+              key={`${String(item.productId)}-${item.productName}`}
+              className="text-xs flex items-center justify-between"
+            >
+              <span className="font-medium">{displayName}</span>
+              <span className="text-muted-foreground ml-2">
+                {quantityLabel && (
+                  <span className="font-bold text-foreground">
+                    {quantityLabel}
+                  </span>
+                )}
+                {Number(item.quantity) > 1 && (
+                  <span className="ml-1">× {Number(item.quantity)}</span>
+                )}
+              </span>
+              <span className="ml-auto pl-2">₹{Number(item.price)}</span>
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-between">
@@ -810,10 +886,14 @@ function DiscountTab() {
   const parsed = parseDiscount(discountRaw ?? "");
   const [percentage, setPercentage] = useState("");
   const [minimumAmount, setMinimumAmount] = useState("");
+  const [flatAmount, setFlatAmount] = useState("");
+  const [flatMinimum, setFlatMinimum] = useState("");
 
   const handleSave = async () => {
     const pct = Number(percentage);
     const min = Number(minimumAmount);
+    const flat = Number(flatAmount);
+    const flatMin = Number(flatMinimum);
     if (Number.isNaN(pct) || pct < 0 || pct > 100) {
       toast.error("Enter a valid percentage (0-100)");
       return;
@@ -822,13 +902,28 @@ function DiscountTab() {
       toast.error("Enter a valid minimum amount");
       return;
     }
+    if (Number.isNaN(flat) || flat < 0) {
+      toast.error("Enter a valid flat amount");
+      return;
+    }
+    if (Number.isNaN(flatMin) || flatMin < 0) {
+      toast.error("Enter a valid flat discount minimum");
+      return;
+    }
     try {
       await setDiscount.mutateAsync(
-        JSON.stringify({ percentage: pct, minimumAmount: min }),
+        JSON.stringify({
+          percentage: pct,
+          minimumAmount: min,
+          flatAmount: flat,
+          flatMinimum: flatMin,
+        }),
       );
       toast.success("Discount updated!");
       setPercentage("");
       setMinimumAmount("");
+      setFlatAmount("");
+      setFlatMinimum("");
     } catch {
       toast.error("Failed to update discount");
     }
@@ -836,16 +931,27 @@ function DiscountTab() {
 
   return (
     <div className="space-y-4">
-      {parsed && parsed.percentage > 0 && (
-        <div className="bg-accent/20 border border-accent/40 rounded-xl p-4">
+      {parsed && (parsed.percentage > 0 || parsed.flatAmount > 0) && (
+        <div className="bg-accent/20 border border-accent/40 rounded-xl p-4 space-y-1">
           <p className="text-xs font-semibold text-muted-foreground mb-1">
             Current Discount
           </p>
-          <p className="font-display font-bold text-accent-foreground">
-            {parsed.percentage}% off on orders above ₹{parsed.minimumAmount}
-          </p>
+          {parsed.percentage > 0 && (
+            <p className="font-display font-bold text-accent-foreground">
+              {parsed.percentage}% off on orders above ₹{parsed.minimumAmount}
+            </p>
+          )}
+          {parsed.flatAmount > 0 && (
+            <p className="font-display font-bold text-accent-foreground">
+              ₹{parsed.flatAmount} off on orders above ₹{parsed.flatMinimum}
+            </p>
+          )}
         </div>
       )}
+
+      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+        Percentage Discount
+      </p>
 
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold">Discount Percentage (%)</Label>
@@ -874,10 +980,50 @@ function DiscountTab() {
         />
       </div>
 
-      {percentage && minimumAmount && (
-        <div className="bg-secondary/60 rounded-lg px-3 py-2 text-xs text-muted-foreground">
-          Preview: Customers get <strong>{percentage}%</strong> off on orders
-          above ₹{minimumAmount}
+      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+        Flat Amount Discount
+      </p>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Flat Amount Off (₹)</Label>
+        <Input
+          data-ocid="admin.discount.input"
+          type="number"
+          placeholder={parsed ? String(parsed.flatAmount) : "e.g. 50"}
+          value={flatAmount}
+          onChange={(e) => setFlatAmount(e.target.value)}
+          min="0"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">
+          Minimum Order for Flat Discount (₹)
+        </Label>
+        <Input
+          data-ocid="admin.discount.input"
+          type="number"
+          placeholder={parsed ? String(parsed.flatMinimum) : "e.g. 300"}
+          value={flatMinimum}
+          onChange={(e) => setFlatMinimum(e.target.value)}
+          min="0"
+        />
+      </div>
+
+      {(percentage || flatAmount) && (
+        <div className="bg-secondary/60 rounded-lg px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+          {percentage && minimumAmount && (
+            <p>
+              Preview: Customers get <strong>{percentage}%</strong> off on
+              orders above ₹{minimumAmount}
+            </p>
+          )}
+          {flatAmount && flatMinimum && (
+            <p>
+              Preview: Customers get <strong>₹{flatAmount}</strong> off on
+              orders above ₹{flatMinimum}
+            </p>
+          )}
         </div>
       )}
 

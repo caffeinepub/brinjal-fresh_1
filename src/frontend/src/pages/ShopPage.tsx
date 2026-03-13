@@ -27,6 +27,16 @@ import {
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
 
+/** Parse "ProductName|Short description" stored in product.name */
+function parseProductName(raw: string): { name: string; description: string } {
+  const idx = raw.indexOf("|");
+  if (idx === -1) return { name: raw, description: "" };
+  return {
+    name: raw.slice(0, idx).trim(),
+    description: raw.slice(idx + 1).trim(),
+  };
+}
+
 function ProductImage({ imageId }: { imageId: string }) {
   const storageClient = useStorageClient();
   const [url, setUrl] = useState<string | null>(null);
@@ -63,10 +73,11 @@ function ProductCard({ product }: { product: Product }) {
   const basePrice = Number(product.price);
   const unitLabel = getUnitLabel(product.category);
   const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
+  const { name, description } = parseProductName(product.name);
 
   const handleAdd = () => {
     addToKart(product, selectedOption);
-    toast.success(`${product.name} added to kart!`);
+    toast.success(`${name} added to kart!`);
   };
 
   return (
@@ -75,11 +86,17 @@ function ProductCard({ product }: { product: Product }) {
       <div className="p-3 flex flex-col gap-2 flex-1">
         <div>
           <h3 className="font-display font-bold text-card-foreground text-sm leading-tight line-clamp-2">
-            {product.name}
+            {name}
           </h3>
-          <p className="text-primary font-bold text-base mt-0.5">
+          {description && (
+            <p className="text-xs text-muted-foreground mt-0.5 italic line-clamp-1">
+              {description}
+            </p>
+          )}
+          {/* Base price per unit */}
+          <p className="text-primary font-extrabold text-lg mt-1">
             ₹{basePrice}
-            <span className="text-xs font-normal text-muted-foreground">
+            <span className="text-xs font-extrabold text-muted-foreground ml-0.5">
               {unitLabel}
             </span>
           </p>
@@ -95,6 +112,7 @@ function ProductCard({ product }: { product: Product }) {
           </Badge>
         )}
 
+        {/* Quantity selector */}
         <Select value={selectedOption} onValueChange={setSelectedOption}>
           <SelectTrigger
             data-ocid="shop.product.select"
@@ -111,10 +129,15 @@ function ProductCard({ product }: { product: Product }) {
           </SelectContent>
         </Select>
 
-        <p className="text-xs text-muted-foreground">
-          Price:{" "}
-          <span className="font-bold text-foreground">₹{calculatedPrice}</span>
-        </p>
+        {/* Calculated price for selected quantity -- bold and prominent */}
+        <div className="bg-primary/10 rounded-lg px-2 py-1.5 text-center">
+          <p className="text-xs text-muted-foreground leading-none mb-0.5">
+            Total for selected qty
+          </p>
+          <p className="text-primary font-extrabold text-xl leading-none">
+            ₹{calculatedPrice}
+          </p>
+        </div>
 
         <Button
           data-ocid="shop.product.button"
@@ -139,19 +162,25 @@ export default function ShopPage() {
 
   const discount = parseDiscount(discountRaw ?? "");
 
-  const filtered = (products ?? []).filter((p: Product) =>
-    p.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = (products ?? []).filter((p: Product) => {
+    const { name } = parseProductName(p.name);
+    return name.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="px-3 py-4 space-y-3">
-      {/* Delivery Timing */}
+      {/* Delivery Timing -- bold and prominent */}
       {deliveryTiming && (
-        <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-lg px-3 py-2">
-          <Clock className="w-4 h-4 text-primary shrink-0" />
-          <span className="text-xs font-medium text-primary">
-            Delivery: {deliveryTiming}
-          </span>
+        <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-lg px-3 py-2.5">
+          <Clock className="w-5 h-5 text-primary shrink-0" />
+          <div>
+            <p className="text-xs text-primary/70 leading-none mb-0.5">
+              Delivery Time
+            </p>
+            <p className="text-sm font-extrabold text-primary leading-none">
+              {deliveryTiming}
+            </p>
+          </div>
         </div>
       )}
 
@@ -174,6 +203,15 @@ export default function ShopPage() {
           <span className="text-xs font-bold text-accent-foreground">
             🎉 {discount.percentage}% OFF on orders above ₹
             {discount.minimumAmount}
+          </span>
+        </div>
+      )}
+      {discount && discount.flatAmount > 0 && (
+        <div className="flex items-center gap-2 bg-accent/20 border border-accent/40 rounded-lg px-3 py-2">
+          <Tag className="w-4 h-4 text-accent-foreground shrink-0" />
+          <span className="text-xs font-bold text-accent-foreground">
+            🎉 ₹{discount.flatAmount} OFF on orders above ₹
+            {discount.flatMinimum}
           </span>
         </div>
       )}

@@ -214,10 +214,13 @@ export function useSetDiscount() {
   });
 }
 
-/** Parse discount stored as JSON string: {"percentage":10,"minimumAmount":300} */
-export function parseDiscount(
-  raw: string,
-): { percentage: number; minimumAmount: number } | null {
+/** Parse discount stored as JSON string */
+export function parseDiscount(raw: string): {
+  percentage: number;
+  minimumAmount: number;
+  flatAmount: number;
+  flatMinimum: number;
+} | null {
   try {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
@@ -225,7 +228,14 @@ export function parseDiscount(
       typeof parsed.percentage === "number" &&
       typeof parsed.minimumAmount === "number"
     ) {
-      return parsed;
+      return {
+        percentage: parsed.percentage,
+        minimumAmount: parsed.minimumAmount,
+        flatAmount:
+          typeof parsed.flatAmount === "number" ? parsed.flatAmount : 0,
+        flatMinimum:
+          typeof parsed.flatMinimum === "number" ? parsed.flatMinimum : 0,
+      };
     }
     return null;
   } catch {
