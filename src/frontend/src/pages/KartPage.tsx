@@ -16,9 +16,15 @@ export default function KartPage() {
   const { data: discountRaw } = useDiscount();
   const placeOrder = usePlaceOrder();
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [name, setName] = useState(
+    () => localStorage.getItem("brinjal_name") ?? "",
+  );
+  const [phone, setPhone] = useState(
+    () => localStorage.getItem("brinjal_phone") ?? "",
+  );
+  const [address, setAddress] = useState(
+    () => localStorage.getItem("brinjal_address") ?? "",
+  );
   const [payment, setPayment] = useState("Cash on Delivery");
   const [ordered, setOrdered] = useState(false);
 
@@ -69,12 +75,21 @@ export default function KartPage() {
         paymentMethod: payment,
         items: items.map((item) => ({
           productId: item.product.id,
-          // Encode quantityOption into productName so admin can display it
-          productName: `${item.product.name} [${item.quantityOption}]`,
-          quantity: BigInt(item.quantity),
-          price: item.itemPrice,
+          productName: item.product.name,
+          quantityLabel: item.quantityOption,
+          unitPrice: item.itemPrice,
+          itemTotal: item.itemPrice * BigInt(item.quantity),
         })),
+        subtotal: BigInt(subtotal),
+        discountAmount: BigInt(discountAmount),
+        totalAmount: BigInt(finalTotal),
       });
+
+      // Save customer info to localStorage for profile + order lookup
+      localStorage.setItem("brinjal_name", name.trim());
+      localStorage.setItem("brinjal_phone", phone.trim());
+      localStorage.setItem("brinjal_address", address.trim());
+
       clearKart();
       setOrdered(true);
       toast.success("Order placed successfully! 🎉");
@@ -118,7 +133,7 @@ export default function KartPage() {
           Your kart is empty
         </h2>
         <p className="text-sm text-muted-foreground">
-          Add vegetables from the Shop tab
+          Add vegetables from the Home tab
         </p>
       </div>
     );

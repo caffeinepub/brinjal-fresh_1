@@ -56,6 +56,32 @@ export function useOrders() {
   });
 }
 
+export function useOrdersByPhone(phone: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Order[]>({
+    queryKey: ["ordersByPhone", phone],
+    queryFn: async () => {
+      if (!actor || !phone) return [];
+      return actor.getOrdersByPhone(phone);
+    },
+    enabled: !!actor && !isFetching && !!phone,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useProfiles() {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getProfiles();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
 export function usePlaceOrder() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -68,9 +94,13 @@ export function usePlaceOrder() {
       items: Array<{
         productId: bigint;
         productName: string;
-        quantity: bigint;
-        price: bigint;
+        quantityLabel: string;
+        unitPrice: bigint;
+        itemTotal: bigint;
       }>;
+      subtotal: bigint;
+      discountAmount: bigint;
+      totalAmount: bigint;
     }) => {
       if (!actor) throw new Error("Not connected");
       return actor.placeOrder(
@@ -79,10 +109,14 @@ export function usePlaceOrder() {
         params.customerAddress,
         params.paymentMethod,
         params.items,
+        params.subtotal,
+        params.discountAmount,
+        params.totalAmount,
       );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["ordersByPhone"] });
     },
   });
 }
@@ -93,10 +127,12 @@ export function useAddProduct() {
   return useMutation({
     mutationFn: async (params: {
       name: string;
+      description: string;
       price: bigint;
       stock: bigint;
       imageId: string;
-      category: string;
+      unitType: string;
+      productCategory: string;
     }) => {
       if (!actor) throw new Error("Not connected");
       return actor.addProduct(
@@ -104,7 +140,9 @@ export function useAddProduct() {
         params.price,
         params.stock,
         params.imageId,
-        params.category,
+        params.unitType,
+        params.productCategory,
+        params.description,
       );
     },
     onSuccess: () => {
@@ -120,10 +158,12 @@ export function useUpdateProduct() {
     mutationFn: async (params: {
       id: bigint;
       name: string;
+      description: string;
       price: bigint;
       stock: bigint;
       imageId: string;
-      category: string;
+      unitType: string;
+      productCategory: string;
     }) => {
       if (!actor) throw new Error("Not connected");
       return actor.updateProduct(
@@ -132,7 +172,9 @@ export function useUpdateProduct() {
         params.price,
         params.stock,
         params.imageId,
-        params.category,
+        params.unitType,
+        params.productCategory,
+        params.description,
       );
     },
     onSuccess: () => {
@@ -168,6 +210,7 @@ export function useUpdateOrderStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["ordersByPhone"] });
     },
   });
 }
@@ -178,7 +221,7 @@ export function useDeleteOrder() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
-      return actor.deleteOrder(id);
+      return (actor as any).deleteOrder(id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -210,6 +253,24 @@ export function useSetDiscount() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["discount"] });
+    },
+  });
+}
+
+export function useSaveProfile() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      name: string;
+      phone: string;
+      address: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.saveProfile(params.name, params.phone, params.address);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profiles"] });
     },
   });
 }

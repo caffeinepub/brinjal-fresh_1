@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  ArrowLeft,
   Clock,
   Eye,
   EyeOff,
@@ -40,10 +41,11 @@ import {
   Tag,
   Trash2,
   Upload,
+  Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { Order, Product } from "../backend";
+import type { CustomerProfile, Order, Product } from "../backend";
 import {
   parseDiscount,
   useAddProduct,
@@ -53,6 +55,7 @@ import {
   useDiscount,
   useOrders,
   useProducts,
+  useProfiles,
   useSetDeliveryTiming,
   useSetDiscount,
   useUpdateOrderStatus,
@@ -78,38 +81,13 @@ const PRICE_LABELS: Record<UnitType, string> = {
   packet: "Price per packet (₹)",
 };
 
-/** Encode/decode name + description as "name|description" */
-function encodeName(name: string, description: string): string {
-  if (!description.trim()) return name.trim();
-  return `${name.trim()}|${description.trim()}`;
-}
-function decodeName(raw: string): { name: string; description: string } {
-  const idx = raw.indexOf("|");
-  if (idx === -1) return { name: raw, description: "" };
-  return {
-    name: raw.slice(0, idx).trim(),
-    description: raw.slice(idx + 1).trim(),
-  };
-}
-
-/**
- * Parse an order item's productName.
- * productName is stored as: "name|description [quantityOption]"
- * Returns { displayName, quantityLabel }
- */
-function parseOrderItemName(productName: string): {
-  displayName: string;
-  quantityLabel: string;
-} {
-  // Extract [quantityOption] from end, e.g. " [250gm]" or " [1 Piece]"
-  const match = productName.match(/\s*\[([^\]]+)\]$/);
-  const quantityLabel = match ? match[1] : "";
-  const rawName = match
-    ? productName.slice(0, productName.length - match[0].length)
-    : productName;
-  const { name } = decodeName(rawName);
-  return { displayName: name, quantityLabel };
-}
+const PRODUCT_CATEGORIES = [
+  "Vegetables",
+  "Fruits",
+  "Leafy Vegetables",
+  "Root Vegetables",
+  "Combo Pack",
+];
 
 // ─── Password Gate ────────────────────────────────────────────────────────────
 function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
@@ -218,6 +196,7 @@ interface ProductFormData {
   name: string;
   description: string;
   unitType: UnitType;
+  productCategory: string;
   price: string;
   stock: string;
   imageId: string;
@@ -227,6 +206,7 @@ const defaultForm = (): ProductFormData => ({
   name: "",
   description: "",
   unitType: "kg",
+  productCategory: "Vegetables",
   price: "",
   stock: "",
   imageId: "",
@@ -291,6 +271,25 @@ function ProductForm({
           }
           maxLength={60}
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Category</Label>
+        <Select
+          value={form.productCategory}
+          onValueChange={(v) => setForm((p) => ({ ...p, productCategory: v }))}
+        >
+          <SelectTrigger data-ocid="admin.products.select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PRODUCT_CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat}>
+                {cat}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-1.5">
@@ -418,11 +417,13 @@ function ProductsTab() {
     }
     try {
       await addProduct.mutateAsync({
-        name: encodeName(data.name, data.description),
+        name: data.name.trim(),
+        description: data.description.trim(),
         price: BigInt(Math.round(Number(data.price))),
         stock: BigInt(Math.round(Number(data.stock))),
         imageId: data.imageId,
-        category: data.unitType,
+        unitType: data.unitType,
+        productCategory: data.productCategory,
       });
       setShowAdd(false);
       toast.success("Product added!");
@@ -436,11 +437,13 @@ function ProductsTab() {
     try {
       await updateProduct.mutateAsync({
         id: editProduct.id,
-        name: encodeName(data.name, data.description),
+        name: data.name.trim(),
+        description: data.description.trim(),
         price: BigInt(Math.round(Number(data.price))),
         stock: BigInt(Math.round(Number(data.stock))),
         imageId: data.imageId,
-        category: data.unitType,
+        unitType: data.unitType,
+        productCategory: data.productCategory,
       });
       setEditProduct(null);
       toast.success("Product updated!");
@@ -485,8 +488,10 @@ function ProductsTab() {
           {editProduct && (
             <ProductForm
               initial={{
-                ...decodeName(editProduct.name),
-                unitType: (editProduct.category as UnitType) || "kg",
+                name: editProduct.name || "",
+                description: editProduct.description || "",
+                unitType: (editProduct.unitType as UnitType) || "kg",
+                productCategory: editProduct.productCategory || "Vegetables",
                 price: String(Number(editProduct.price)),
                 stock: String(Number(editProduct.stock)),
                 imageId: editProduct.imageId,
@@ -517,79 +522,76 @@ function ProductsTab() {
         </div>
       ) : (
         <div className="space-y-2">
-          {products.map((product: Product, idx: number) => {
-            const { name, description } = decodeName(product.name);
-            return (
-              <div
-                key={product.id.toString()}
-                data-ocid={`admin.products.item.${idx + 1}`}
-                className="bg-card rounded-xl p-3 flex items-center gap-3 shadow-xs"
-              >
-                <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0">
-                  <ProductThumb imageId={product.imageId} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-sm truncate">
-                    {name}
-                  </p>
-                  {description && (
-                    <p className="text-xs text-muted-foreground italic truncate">
-                      {description}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    ₹{Number(product.price)}/{product.category || "kg"} • Stock:{" "}
-                    {Number(product.stock)}
-                  </p>
-                </div>
-                <div className="flex gap-1.5">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    data-ocid={`admin.products.edit_button.${idx + 1}`}
-                    className="w-8 h-8"
-                    onClick={() => setEditProduct(product)}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        data-ocid={`admin.products.delete_button.${idx + 1}`}
-                        className="w-8 h-8"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Product</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete "{name}"?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel data-ocid="admin.products.cancel_button">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          data-ocid="admin.products.confirm_button"
-                          onClick={() => {
-                            deleteProduct.mutate(product.id);
-                            toast.success("Product deleted");
-                          }}
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+          {products.map((product: Product, idx: number) => (
+            <div
+              key={product.id.toString()}
+              data-ocid={`admin.products.item.${idx + 1}`}
+              className="bg-card rounded-xl p-3 flex items-center gap-3 shadow-xs"
+            >
+              <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0">
+                <ProductThumb imageId={product.imageId} />
               </div>
-            );
-          })}
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-bold text-sm truncate">
+                  {product.name}
+                </p>
+                {product.description && (
+                  <p className="text-xs text-muted-foreground italic truncate">
+                    {product.description}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  ₹{Number(product.price)}/{product.unitType || "kg"} •{" "}
+                  {product.productCategory} • Stock: {Number(product.stock)}
+                </p>
+              </div>
+              <div className="flex gap-1.5">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  data-ocid={`admin.products.edit_button.${idx + 1}`}
+                  className="w-8 h-8"
+                  onClick={() => setEditProduct(product)}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      data-ocid={`admin.products.delete_button.${idx + 1}`}
+                      className="w-8 h-8"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete "{product.name}"?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-ocid="admin.products.cancel_button">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        data-ocid="admin.products.confirm_button"
+                        onClick={() => {
+                          deleteProduct.mutate(product.id);
+                          toast.success("Product deleted");
+                        }}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -652,37 +654,32 @@ function OrderCard({ order, idx }: { order: Order; idx: number }) {
         {order.customerAddress}
       </div>
 
-      {/* Order items -- show product name, quantity label (e.g. 250gm), count, and price */}
+      {/* Order items */}
       <div className="space-y-1">
-        {order.items.map((item) => {
-          const { displayName, quantityLabel } = parseOrderItemName(
-            item.productName,
-          );
-          return (
-            <div
-              key={`${String(item.productId)}-${item.productName}`}
-              className="text-xs flex items-center justify-between"
-            >
-              <span className="font-medium">{displayName}</span>
-              <span className="text-muted-foreground ml-2">
-                {quantityLabel && (
-                  <span className="font-bold text-foreground">
-                    {quantityLabel}
-                  </span>
-                )}
-                {Number(item.quantity) > 1 && (
-                  <span className="ml-1">× {Number(item.quantity)}</span>
-                )}
+        {order.items.map((item) => (
+          <div
+            key={`${String(item.productId)}-${item.productName}`}
+            className="text-xs flex items-center justify-between"
+          >
+            <span className="font-medium">{item.productName}</span>
+            {item.quantityLabel && (
+              <span className="font-bold text-foreground ml-2">
+                {item.quantityLabel}
               </span>
-              <span className="ml-auto pl-2">₹{Number(item.price)}</span>
-            </div>
-          );
-        })}
+            )}
+            <span className="ml-auto pl-2">₹{Number(item.itemTotal)}</span>
+          </div>
+        ))}
       </div>
 
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
+          {Number(order.discountAmount) > 0 && (
+            <p className="text-xs text-green-600">
+              Discount: -₹{Number(order.discountAmount)}
+            </p>
+          )}
           <p className="font-bold text-sm">
             Total: ₹{Number(order.totalAmount)}
           </p>
@@ -1045,71 +1042,159 @@ function DiscountTab() {
   );
 }
 
-// ─── Admin Page ───────────────────────────────────────────────────────────────
-export default function AdminPage() {
-  // Always start locked -- password required every time
-  const [isAdmin, setIsAdmin] = useState(false);
+// ─── Profiles Tab ─────────────────────────────────────────────────────────────
+function ProfilesTab() {
+  const { data: profiles, isLoading } = useProfiles();
 
-  if (!isAdmin) {
-    return <PasswordGate onSuccess={() => setIsAdmin(true)} />;
+  if (isLoading) {
+    return (
+      <div data-ocid="admin.profiles.loading_state" className="space-y-2">
+        {["pr1", "pr2", "pr3"].map((k) => (
+          <Skeleton key={k} className="h-16 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!profiles?.length) {
+    return (
+      <div data-ocid="admin.profiles.empty_state" className="text-center py-12">
+        <Users className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
+        <p className="text-sm text-muted-foreground">
+          No customer profiles yet.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="px-3 py-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-xl font-bold text-foreground">
+    <div className="space-y-2">
+      {profiles.map((profile: CustomerProfile, idx: number) => (
+        <div
+          key={profile.phone}
+          data-ocid={`admin.profiles.item.${idx + 1}`}
+          className="bg-card rounded-xl p-3 shadow-xs"
+        >
+          <p className="font-display font-bold text-sm">{profile.name}</p>
+          <p className="text-xs text-muted-foreground">{profile.phone}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {profile.address}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Admin Page ───────────────────────────────────────────────────────────────
+interface AdminPageProps {
+  onClose: () => void;
+}
+
+export default function AdminPage({ onClose }: AdminPageProps) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="flex items-center px-3 py-3 border-b border-gray-100">
+          <button
+            type="button"
+            data-ocid="admin.close_button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-gray-600"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+        </div>
+        <PasswordGate onSuccess={() => setIsAdmin(true)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-3 border-b border-gray-100 bg-white">
+        <button
+          type="button"
+          data-ocid="admin.close_button"
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-gray-600"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back</span>
+        </button>
+        <h2 className="font-display text-base font-bold text-foreground">
           Admin Panel
         </h2>
-        <Button size="sm" variant="outline" onClick={() => setIsAdmin(false)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-xs"
+          onClick={() => setIsAdmin(false)}
+        >
           Logout
         </Button>
       </div>
 
-      <Tabs defaultValue="products">
-        <TabsList className="w-full grid grid-cols-4 mb-4">
-          <TabsTrigger
-            data-ocid="admin.products.tab"
-            value="products"
-            className="text-xs"
-          >
-            <Package className="w-3.5 h-3.5 mr-1" /> Products
-          </TabsTrigger>
-          <TabsTrigger
-            data-ocid="admin.orders.tab"
-            value="orders"
-            className="text-xs"
-          >
-            Orders
-          </TabsTrigger>
-          <TabsTrigger
-            data-ocid="admin.delivery.tab"
-            value="delivery"
-            className="text-xs"
-          >
-            <Clock className="w-3.5 h-3.5 mr-1" /> Delivery
-          </TabsTrigger>
-          <TabsTrigger
-            data-ocid="admin.discount.tab"
-            value="discount"
-            className="text-xs"
-          >
-            <Tag className="w-3.5 h-3.5 mr-1" /> Discount
-          </TabsTrigger>
-        </TabsList>
+      <div className="px-3 py-4">
+        <Tabs defaultValue="products">
+          <TabsList className="w-full grid grid-cols-5 mb-4">
+            <TabsTrigger
+              data-ocid="admin.products.tab"
+              value="products"
+              className="text-[10px]"
+            >
+              Products
+            </TabsTrigger>
+            <TabsTrigger
+              data-ocid="admin.orders.tab"
+              value="orders"
+              className="text-[10px]"
+            >
+              Orders
+            </TabsTrigger>
+            <TabsTrigger
+              data-ocid="admin.delivery.tab"
+              value="delivery"
+              className="text-[10px]"
+            >
+              Delivery
+            </TabsTrigger>
+            <TabsTrigger
+              data-ocid="admin.discount.tab"
+              value="discount"
+              className="text-[10px]"
+            >
+              Discount
+            </TabsTrigger>
+            <TabsTrigger
+              data-ocid="admin.profiles.tab"
+              value="profiles"
+              className="text-[10px]"
+            >
+              Profiles
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="products">
-          <ProductsTab />
-        </TabsContent>
-        <TabsContent value="orders">
-          <OrdersTab />
-        </TabsContent>
-        <TabsContent value="delivery">
-          <DeliveryTab />
-        </TabsContent>
-        <TabsContent value="discount">
-          <DiscountTab />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="products">
+            <ProductsTab />
+          </TabsContent>
+          <TabsContent value="orders">
+            <OrdersTab />
+          </TabsContent>
+          <TabsContent value="delivery">
+            <DeliveryTab />
+          </TabsContent>
+          <TabsContent value="discount">
+            <DiscountTab />
+          </TabsContent>
+          <TabsContent value="profiles">
+            <ProfilesTab />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

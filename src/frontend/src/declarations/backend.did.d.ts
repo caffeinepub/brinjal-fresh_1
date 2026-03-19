@@ -10,30 +10,46 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface CustomerProfile {
+  'name' : string,
+  'updatedAt' : bigint,
+  'address' : string,
+  'phone' : string,
+}
 export interface Order {
   'id' : bigint,
   'customerName' : string,
   'status' : string,
   'paymentMethod' : string,
   'customerPhone' : string,
+  'discountAmount' : bigint,
   'createdAt' : bigint,
   'customerAddress' : string,
   'totalAmount' : bigint,
   'items' : Array<OrderItem>,
+  'subtotal' : bigint,
 }
 export interface OrderItem {
+  'itemTotal' : bigint,
   'productId' : bigint,
   'productName' : string,
-  'quantity' : bigint,
-  'price' : bigint,
+  'quantityLabel' : string,
+  'unitPrice' : bigint,
 }
 export interface Product {
   'id' : bigint,
+  'unitType' : string,
+  'productCategory' : string,
   'name' : string,
+  'description' : string,
   'stock' : bigint,
-  'category' : string,
   'imageId' : string,
   'price' : bigint,
+}
+export interface UserProfile {
+  'name' : string,
+  'address' : string,
+  'phone' : string,
 }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
@@ -66,26 +82,35 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'addProduct' : ActorMethod<[string, bigint, bigint, string, string], bigint>,
+  'addProduct' : ActorMethod<
+    [string, bigint, bigint, string, string, string, string],
+    bigint
+  >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'deleteOrder' : ActorMethod<[bigint], undefined>,
   'deleteProduct' : ActorMethod<[bigint], undefined>,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getDeliveryTiming' : ActorMethod<[], string>,
   'getDiscount' : ActorMethod<[], string>,
   'getOrders' : ActorMethod<[], Array<Order>>,
+  'getOrdersByPhone' : ActorMethod<[string], Array<Order>>,
   'getProduct' : ActorMethod<[bigint], Product>,
   'getProducts' : ActorMethod<[], Array<Product>>,
+  'getProfiles' : ActorMethod<[], Array<CustomerProfile>>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'placeOrder' : ActorMethod<
-    [string, string, string, string, Array<OrderItem>],
+    [string, string, string, string, Array<OrderItem>, bigint, bigint, bigint],
     bigint
   >,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'saveProfile' : ActorMethod<[string, string, string], undefined>,
   'setDeliveryTiming' : ActorMethod<[string], undefined>,
   'setDiscount' : ActorMethod<[string], undefined>,
   'updateOrderStatus' : ActorMethod<[bigint, string], undefined>,
   'updateProduct' : ActorMethod<
-    [bigint, string, bigint, bigint, string, string],
+    [bigint, string, bigint, bigint, string, string, string, string],
     undefined
   >,
 }
