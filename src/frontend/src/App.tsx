@@ -29,53 +29,115 @@ function AppContent() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <header
-        className="sticky top-0 z-40 shadow-md"
-        style={{ backgroundColor: "#1a5c2a" }}
+        className="sticky top-0 z-40 shadow-lg"
+        style={{
+          background:
+            "linear-gradient(135deg, #0a3d1a 0%, #1a5c2a 40%, #22c55e 100%)",
+        }}
       >
+        {/* Top glow bar */}
+        <div
+          className="h-0.5 w-full"
+          style={{
+            background: "linear-gradient(90deg, #4ade80, #a3e635, #4ade80)",
+          }}
+        />
         <div className="flex items-center justify-between px-3 py-2.5 gap-2">
-          {/* Left: logo */}
+          {/* Left: logo — bold and attractive */}
           <button
             type="button"
             onClick={() => setActiveTab("home")}
-            className="flex items-center gap-1.5 shrink-0"
+            className="flex items-center gap-2 shrink-0"
           >
-            <span className="text-xl">🥦</span>
-            <span className="text-white font-bold text-base tracking-tight font-display">
-              Brinjal<span className="opacity-75">.fresh</span>
-            </span>
+            {/* Basket icon with glow ring */}
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0"
+              style={{
+                background: "linear-gradient(135deg, #16a34a, #4ade80)",
+                boxShadow: "0 0 10px rgba(74,222,128,0.5)",
+              }}
+            >
+              <span className="text-lg leading-none">🧺</span>
+            </div>
+            {/* Brand name */}
+            <div className="flex flex-col leading-tight">
+              <span
+                className="font-black tracking-tight leading-none"
+                style={{
+                  fontSize: "1.2rem",
+                  color: "#ffffff",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                  letterSpacing: "-0.5px",
+                }}
+              >
+                Brinjal
+                <span
+                  className="font-black"
+                  style={{
+                    color: "#a3e635",
+                    textShadow: "0 0 8px rgba(163,230,53,0.6)",
+                  }}
+                >
+                  .fresh
+                </span>
+              </span>
+              <span
+                className="text-white/60 font-medium"
+                style={{ fontSize: "0.55rem", letterSpacing: "0.08em" }}
+              >
+                FRESH VEGETABLES & MORE
+              </span>
+            </div>
           </button>
 
           {/* Center: location pill */}
           <div className="flex-1 flex justify-center">
-            <div className="flex items-center gap-1 bg-white/15 rounded-full px-3 py-1">
-              <MapPin className="w-3 h-3 text-orange-300" />
-              <span className="text-white text-xs font-medium">
+            <div
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 cursor-pointer"
+              style={{
+                background: "rgba(255,255,255,0.18)",
+                border: "1px solid rgba(255,255,255,0.28)",
+              }}
+            >
+              <MapPin className="w-3 h-3 text-lime-300" />
+              <span className="text-white text-[11px] font-semibold">
                 Deliver to: Store
               </span>
               <ChevronDown className="w-3 h-3 text-white/70" />
             </div>
           </div>
 
-          {/* Right: bell + cart */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Right: bell + cart in rounded square buttons */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              className="relative"
               aria-label="Notifications"
+              className="relative w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{
+                background: "rgba(255,255,255,0.18)",
+                border: "1px solid rgba(255,255,255,0.28)",
+              }}
             >
-              <Bell className="w-5 h-5 text-white" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+              <Bell className="w-4 h-4 text-white" />
+              <span
+                className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-400 rounded-full"
+                style={{ boxShadow: "0 0 4px rgba(248,113,113,0.8)" }}
+              />
             </button>
             <button
               type="button"
               data-ocid="header.cart.button"
               aria-label="Cart"
               onClick={() => setActiveTab("cart")}
-              className="relative"
+              className="relative w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{
+                background: "rgba(255,255,255,0.18)",
+                border: "1px solid rgba(255,255,255,0.28)",
+              }}
             >
-              <ShoppingCart className="w-5 h-5 text-white" />
+              <ShoppingCart className="w-4 h-4 text-white" />
               {totalItems > 0 && (
-                <span className="absolute -top-1.5 -right-2 bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center">
                   {totalItems > 9 ? "9+" : totalItems}
                 </span>
               )}

@@ -150,7 +150,6 @@ actor {
 
   let userProfiles = Map.empty<Principal, UserProfile>();
 
-  // User Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -172,7 +171,6 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Product APIs - Admin only for modifications, public for reads
   public shared ({ caller }) func addProduct(
     name : Text,
     price : Nat,
@@ -218,19 +216,7 @@ actor {
     switch (productsNew.get(id)) {
       case (null) { Runtime.trap("Product not found") };
       case (?_) {
-        productsNew.add(
-          id,
-          {
-            id;
-            name;
-            price;
-            stock;
-            imageId;
-            unitType;
-            productCategory;
-            description;
-          },
-        );
+        productsNew.add(id, { id; name; price; stock; imageId; unitType; productCategory; description });
       };
     };
   };
@@ -242,8 +228,8 @@ actor {
     productsNew.remove(id);
   };
 
-  // Order APIs
-  public shared ({ caller }) func placeOrder(
+  // placeOrder is open to all anonymous customers - no login required
+  public shared func placeOrder(
     customerName : Text,
     customerPhone : Text,
     customerAddress : Text,
@@ -253,9 +239,6 @@ actor {
     discountAmount : Nat,
     totalAmount : Nat,
   ) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can place orders");
-    };
     let id = nextOrderId;
     ordersNew.add(
       id,
@@ -284,23 +267,8 @@ actor {
     ordersNew.values().toArray();
   };
 
-  public query ({ caller }) func getOrdersByPhone(phone : Text) : async [Order] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view orders");
-    };
-    let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    if (not isAdmin) {
-      switch (userProfiles.get(caller)) {
-        case (?profile) {
-          if (profile.phone != phone) {
-            Runtime.trap("Unauthorized: Can only view your own orders");
-          };
-        };
-        case (null) {
-          Runtime.trap("Unauthorized: Profile not found");
-        };
-      };
-    };
+  // getOrdersByPhone open to all - customers look up by their own phone number
+  public query func getOrdersByPhone(phone : Text) : async [Order] {
     ordersNew.values().filter(func(o : Order) : Bool { o.customerPhone == phone }).toArray();
   };
 
@@ -338,11 +306,8 @@ actor {
     ordersNew.remove(id);
   };
 
-  // Profile APIs - Customer profiles (different from user auth profiles)
-  public shared ({ caller }) func saveProfile(name : Text, phone : Text, address : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
+  // saveProfile open to all anonymous customers - no login required
+  public shared func saveProfile(name : Text, phone : Text, address : Text) : async () {
     profiles.add(phone, { phone; name; address; updatedAt = Time.now() });
   };
 
@@ -353,7 +318,6 @@ actor {
     profiles.values().toArray();
   };
 
-  // Settings APIs
   public query func getDeliveryTiming() : async Text {
     deliveryTiming;
   };
@@ -376,4 +340,3 @@ actor {
     discountText := text;
   };
 };
-
