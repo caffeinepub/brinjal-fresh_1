@@ -1,47 +1,53 @@
 export interface OrderItem {
     productId: bigint;
     productName: string;
-    quantity: bigint;
-    price: bigint;
+    quantityLabel: string;
+    unitPrice: bigint;
+    itemTotal: bigint;
 }
 export interface Order {
     id: bigint;
     customerName: string;
-    status: string;
-    paymentMethod: string;
     customerPhone: string;
-    createdAt: bigint;
     customerAddress: string;
-    totalAmount: bigint;
+    paymentMethod: string;
     items: Array<OrderItem>;
+    subtotal: bigint;
+    discountAmount: bigint;
+    totalAmount: bigint;
+    status: string;
+    createdAt: bigint;
 }
 export interface Product {
     id: bigint;
     name: string;
-    stock: bigint;
-    category: string;
-    imageId: string;
     price: bigint;
+    stock: bigint;
+    imageId: string;
+    unitType: string;
+    productCategory: string;
+    description: string;
 }
-export interface Feedback {
-    id: bigint;
-    customerName: string;
-    message: string;
-    createdAt: bigint;
+export interface CustomerProfile {
+    phone: string;
+    name: string;
+    address: string;
+    updatedAt: bigint;
 }
 export interface backendInterface {
-    addProduct(name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<bigint>;
+    addProduct(name: string, price: bigint, stock: bigint, imageId: string, unitType: string, productCategory: string, description: string): Promise<bigint>;
     deleteProduct(id: bigint): Promise<void>;
     getDeliveryTiming(): Promise<string>;
     getDiscount(): Promise<string>;
     getOrders(): Promise<Array<Order>>;
+    getOrdersByPhone(phone: string): Promise<Array<Order>>;
     getProduct(id: bigint): Promise<Product>;
     getProducts(): Promise<Array<Product>>;
-    placeOrder(customerName: string, customerPhone: string, customerAddress: string, paymentMethod: string, items: Array<OrderItem>): Promise<bigint>;
+    placeOrder(customerName: string, customerPhone: string, customerAddress: string, paymentMethod: string, items: Array<OrderItem>, subtotal: bigint, discountAmount: bigint, totalAmount: bigint): Promise<bigint>;
     setDeliveryTiming(timing: string): Promise<void>;
     setDiscount(discountText: string): Promise<void>;
-    updateOrderStatus(orderId: bigint, status: string): Promise<void>;
-    updateProduct(id: bigint, name: string, price: bigint, stock: bigint, imageId: string, category: string): Promise<void>;
-    submitFeedback(customerName: string, message: string): Promise<bigint>;
-    getFeedbacks(): Promise<Array<Feedback>>;
+    updateOrderStatus(id: bigint, status: string): Promise<void>;
+    updateProduct(id: bigint, name: string, price: bigint, stock: bigint, imageId: string, unitType: string, productCategory: string, description: string): Promise<void>;
+    saveProfile(name: string, phone: string, address: string): Promise<void>;
+    getProfiles(): Promise<Array<CustomerProfile>>;
 }

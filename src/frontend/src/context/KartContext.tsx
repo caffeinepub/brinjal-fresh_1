@@ -4,8 +4,8 @@ import type { Product } from "../backend";
 export interface KartItem {
   product: Product;
   quantity: number;
-  quantityOption: string; // e.g. "500gm", "1 Piece", "2 Bundles"
-  itemPrice: bigint; // price for this quantity option
+  quantityOption: string;
+  itemPrice: bigint;
 }
 
 interface KartContextValue {
@@ -29,11 +29,14 @@ export function getOptionPrice(
   basePrice: bigint,
   quantityOption: string,
 ): bigint {
-  // Weight-based (kg)
+  // Weight-based (kg) — new 3-option set
+  if (quantityOption === "250g") return (basePrice * 25n) / 100n;
+  if (quantityOption === "500g") return (basePrice * 50n) / 100n;
+  if (quantityOption === "1kg") return basePrice;
+  // Legacy weight options (backwards compat)
   if (quantityOption === "250gm") return (basePrice * 25n) / 100n;
   if (quantityOption === "500gm") return (basePrice * 50n) / 100n;
   if (quantityOption === "750gm") return (basePrice * 75n) / 100n;
-  if (quantityOption === "1kg") return basePrice;
   if (quantityOption === "2kg") return basePrice * 2n;
   // Pieces
   if (quantityOption === "1 Piece") return basePrice;
@@ -48,7 +51,6 @@ export function getOptionPrice(
   if (quantityOption === "1 Packet") return basePrice;
   if (quantityOption === "2 Packets") return basePrice * 2n;
   if (quantityOption === "3 Packets") return basePrice * 3n;
-  // default: 1x
   return basePrice;
 }
 
@@ -61,8 +63,8 @@ export function getQuantityOptions(category: string): string[] {
       return ["1 Bundle", "2 Bundles", "3 Bundles"];
     case "packet":
       return ["1 Packet", "2 Packets", "3 Packets"];
-    default: // kg
-      return ["250gm", "500gm", "750gm", "1kg", "2kg"];
+    default: // kg — 3 options only
+      return ["250g", "500g", "1kg"];
   }
 }
 

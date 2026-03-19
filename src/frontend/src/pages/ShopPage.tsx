@@ -1,15 +1,5 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Search, ShoppingCart, Tag } from "lucide-react";
+import { Barcode, Mic, Search, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { Product } from "../backend";
@@ -51,14 +41,44 @@ function ProductImage({ imageId }: { imageId: string }) {
 
   if (!imageId || !url) {
     return (
-      <div className="w-full aspect-square bg-secondary flex items-center justify-center rounded-t-xl">
+      <div className="w-full aspect-square bg-secondary flex items-center justify-center">
         <span className="text-4xl">🥦</span>
       </div>
     );
   }
   return (
-    <div className="w-full aspect-square bg-secondary rounded-t-xl overflow-hidden">
+    <div className="w-full aspect-square bg-secondary overflow-hidden">
       <img src={url} alt="product" className="w-full h-full object-cover" />
+    </div>
+  );
+}
+
+function QuantityButtons({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: string[];
+  selected: string;
+  onSelect: (opt: string) => void;
+}) {
+  const visible = options.slice(0, 3);
+  return (
+    <div className="flex gap-1">
+      {visible.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onSelect(opt)}
+          className={`flex-1 text-[10px] font-bold py-1 rounded-md border transition-colors ${
+            selected === opt
+              ? "bg-green-700 text-white border-green-700"
+              : "bg-white text-gray-600 border-gray-300"
+          }`}
+        >
+          {opt}
+        </button>
+      ))}
     </div>
   );
 }
@@ -66,96 +86,91 @@ function ProductImage({ imageId }: { imageId: string }) {
 function ProductCard({ product }: { product: Product }) {
   const { addToKart } = useKart();
   const options = getQuantityOptions(product.category);
-  const [selectedOption, setSelectedOption] = useState(
-    options[1] ?? options[0],
-  );
+  const [selectedOption, setSelectedOption] = useState(options[0]);
 
   const basePrice = Number(product.price);
   const unitLabel = getUnitLabel(product.category);
   const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
   const { name, description } = parseProductName(product.name);
+  const inStock = Number(product.stock) > 0;
 
   const handleAdd = () => {
+    if (!inStock) return;
     addToKart(product, selectedOption);
     toast.success(`${name} added to kart!`);
   };
 
   return (
-    <div className="bg-card rounded-xl shadow-card overflow-hidden flex flex-col">
-      <ProductImage imageId={product.imageId} />
-      <div className="p-3 flex flex-col gap-2 flex-1">
-        <div>
-          <h3 className="font-display font-bold text-card-foreground text-sm leading-tight line-clamp-2">
-            {name}
-          </h3>
-          {description && (
-            <p className="text-xs text-muted-foreground mt-0.5 italic line-clamp-1">
-              {description}
-            </p>
-          )}
-          {/* Base price per unit */}
-          <p className="text-primary font-extrabold text-lg mt-1">
-            ₹{basePrice}
-            <span className="text-xs font-extrabold text-muted-foreground ml-0.5">
-              {unitLabel}
+    <div className="bg-white rounded-xl shadow-card overflow-hidden flex flex-col w-40 shrink-0">
+      <div className="relative">
+        <ProductImage imageId={product.imageId} />
+        {!inStock && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="text-white text-[10px] font-bold bg-red-500 px-2 py-0.5 rounded">
+              Out of Stock
             </span>
-          </p>
-        </div>
+          </div>
+        )}
+      </div>
 
-        {Number(product.stock) > 0 ? (
-          <Badge variant="secondary" className="w-fit text-xs">
-            Stock: {Number(product.stock)}
-          </Badge>
-        ) : (
-          <Badge variant="destructive" className="w-fit text-xs">
-            Out of Stock
-          </Badge>
+      <div className="p-2 flex flex-col gap-1.5 flex-1">
+        <h3 className="font-display font-bold text-gray-800 text-xs leading-tight line-clamp-2">
+          {name}
+        </h3>
+        {description && (
+          <p className="text-[10px] text-gray-500 italic line-clamp-1">
+            {description}
+          </p>
         )}
 
-        {/* Quantity selector */}
-        <Select value={selectedOption} onValueChange={setSelectedOption}>
-          <SelectTrigger
-            data-ocid="shop.product.select"
-            className="h-8 text-xs font-bold border-border"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((opt) => (
-              <SelectItem key={opt} value={opt} className="font-bold">
-                {opt}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Price per unit — red bold */}
+        <p className="text-red-600 font-extrabold text-sm leading-none">
+          ₹{basePrice}
+          <span className="text-gray-500 font-bold text-[10px] ml-0.5">
+            {unitLabel}
+          </span>
+        </p>
 
-        {/* Calculated price for selected quantity -- bold and prominent */}
-        <div className="bg-primary/10 rounded-lg px-2 py-1.5 text-center">
-          <p className="text-xs text-muted-foreground leading-none mb-0.5">
-            Total for selected qty
-          </p>
-          <p className="text-primary font-extrabold text-xl leading-none">
-            ₹{calculatedPrice}
-          </p>
-        </div>
+        {/* Inline quantity buttons */}
+        <QuantityButtons
+          options={options}
+          selected={selectedOption}
+          onSelect={setSelectedOption}
+        />
 
-        <Button
+        {/* Price for selected qty — green bold */}
+        <p className="text-green-700 font-extrabold text-sm text-center leading-none">
+          ₹{calculatedPrice}
+        </p>
+
+        {/* Add button */}
+        <button
+          type="button"
           data-ocid="shop.product.button"
-          size="sm"
           onClick={handleAdd}
-          disabled={Number(product.stock) === 0}
-          className="w-full mt-auto font-bold"
+          disabled={!inStock}
+          className="w-full py-1.5 rounded-lg text-[11px] font-bold text-white transition-colors disabled:opacity-50"
+          style={{ backgroundColor: inStock ? "#1a5c2a" : "#9ca3af" }}
         >
-          <ShoppingCart className="w-3.5 h-3.5 mr-1.5" />
-          Add to Kart
-        </Button>
+          + Add
+        </button>
       </div>
     </div>
   );
 }
 
+const CATEGORIES = [
+  { label: "Vegetables", emoji: "🥬", key: "vegetables" },
+  { label: "Fruits", emoji: "🍎", key: "fruits" },
+  { label: "Daily Use", emoji: "🥚", key: "daily" },
+  { label: "Combo Packs", emoji: "🛒", key: "combo", badge: "Hot" },
+  { label: "Offers", emoji: "⭐", key: "offers", badge: "Hot" },
+  { label: "Organic", emoji: "🌿", key: "organic", badge: "New" },
+];
+
 export default function ShopPage() {
   const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
   const { data: products, isLoading } = useProducts();
   const { data: deliveryTiming } = useDeliveryTiming();
   const { data: discountRaw } = useDiscount();
@@ -168,67 +183,130 @@ export default function ShopPage() {
   });
 
   return (
-    <div className="px-3 py-4 space-y-3">
-      {/* Delivery Timing -- bold and prominent */}
-      {deliveryTiming && (
-        <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-lg px-3 py-2.5">
-          <Clock className="w-5 h-5 text-primary shrink-0" />
-          <div>
-            <p className="text-xs text-primary/70 leading-none mb-0.5">
-              Delivery Time
-            </p>
-            <p className="text-sm font-extrabold text-primary leading-none">
-              {deliveryTiming}
-            </p>
-          </div>
+    <div className="pb-4">
+      {/* Search bar */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 shadow-xs border border-gray-100">
+          <Search className="w-4 h-4 text-gray-400 shrink-0" />
+          <input
+            data-ocid="shop.search_input"
+            type="text"
+            placeholder="Search Vegetables & Fruits..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
+          />
+          <button
+            type="button"
+            aria-label="Voice search"
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ backgroundColor: "#1a5c2a" }}
+          >
+            <Mic className="w-4 h-4 text-white" />
+          </button>
+          <Barcode className="w-5 h-5 text-gray-400 shrink-0" />
         </div>
-      )}
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          data-ocid="shop.search_input"
-          placeholder="Search vegetables..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-card border-border"
-        />
       </div>
 
-      {/* Discount Banner */}
+      {/* Category tiles */}
+      <div className="px-3 mb-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() =>
+                setActiveCategory(cat.key === activeCategory ? "all" : cat.key)
+              }
+              className={`flex flex-col items-center gap-1 shrink-0 rounded-xl p-2 w-16 border-2 transition-colors relative ${
+                activeCategory === cat.key
+                  ? "border-green-700 bg-green-50"
+                  : "border-gray-200 bg-white"
+              }`}
+            >
+              {cat.badge && (
+                <span
+                  className={`absolute -top-1 -right-1 text-[8px] font-bold px-1 rounded-full ${
+                    cat.badge === "New"
+                      ? "bg-green-500 text-white"
+                      : "bg-red-500 text-white"
+                  }`}
+                >
+                  {cat.badge}
+                </span>
+              )}
+              <span className="text-2xl">{cat.emoji}</span>
+              <span className="text-[10px] font-semibold text-gray-700 text-center leading-tight">
+                {cat.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Info banners row */}
+      <div className="px-3 mb-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {deliveryTiming && (
+            <div className="shrink-0 flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 shadow-xs border border-gray-100">
+              <span className="text-sm">🚚</span>
+              <span className="text-orange-600 text-xs font-bold whitespace-nowrap">
+                {deliveryTiming}
+              </span>
+            </div>
+          )}
+          <div className="shrink-0 flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 shadow-xs border border-gray-100">
+            <span className="text-sm">🚚</span>
+            <span className="text-green-700 text-xs font-bold whitespace-nowrap">
+              Free Delivery Above ₹99
+            </span>
+          </div>
+          <div className="shrink-0 flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 shadow-xs border border-gray-100">
+            <span className="text-sm">💰</span>
+            <span className="text-yellow-600 text-xs font-bold whitespace-nowrap">
+              No Hidden Charges
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Discount banners */}
       {discount && discount.percentage > 0 && (
-        <div className="flex items-center gap-2 bg-accent/20 border border-accent/40 rounded-lg px-3 py-2">
-          <Tag className="w-4 h-4 text-accent-foreground shrink-0" />
-          <span className="text-xs font-bold text-accent-foreground">
+        <div className="mx-3 mb-2 flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+          <Tag className="w-4 h-4 text-yellow-600 shrink-0" />
+          <span className="text-xs font-bold text-yellow-700">
             🎉 {discount.percentage}% OFF on orders above ₹
             {discount.minimumAmount}
           </span>
         </div>
       )}
       {discount && discount.flatAmount > 0 && (
-        <div className="flex items-center gap-2 bg-accent/20 border border-accent/40 rounded-lg px-3 py-2">
-          <Tag className="w-4 h-4 text-accent-foreground shrink-0" />
-          <span className="text-xs font-bold text-accent-foreground">
+        <div className="mx-3 mb-2 flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+          <Tag className="w-4 h-4 text-yellow-600 shrink-0" />
+          <span className="text-xs font-bold text-yellow-700">
             🎉 ₹{discount.flatAmount} OFF on orders above ₹
             {discount.flatMinimum}
           </span>
         </div>
       )}
 
-      {/* Products Grid */}
       {isLoading ? (
-        <div data-ocid="shop.loading_state" className="grid grid-cols-2 gap-3">
-          {["s1", "s2", "s3", "s4", "s5", "s6"].map((k) => (
-            <div key={k} className="bg-card rounded-xl overflow-hidden">
-              <Skeleton className="aspect-square w-full" />
-              <div className="p-3 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-                <Skeleton className="h-8 w-full" />
+        <div data-ocid="shop.loading_state" className="px-3 py-4">
+          <div className="flex gap-3 overflow-x-auto">
+            {[1, 2, 3].map((k) => (
+              <div
+                key={k}
+                className="w-40 shrink-0 bg-white rounded-xl overflow-hidden"
+              >
+                <Skeleton className="aspect-square w-full" />
+                <div className="p-2 space-y-2">
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-6 w-full" />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <div
@@ -236,28 +314,75 @@ export default function ShopPage() {
           className="flex flex-col items-center py-16 gap-3"
         >
           <span className="text-5xl">🛒</span>
-          <p className="text-muted-foreground font-medium text-sm">
+          <p className="text-gray-500 font-medium text-sm">
             {search
               ? "No products match your search"
               : "No products available yet"}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {filtered.map((product: Product, idx: number) => (
-            <div
-              key={product.id.toString()}
-              data-ocid={`shop.product.item.${idx + 1}`}
-            >
-              <ProductCard product={product} />
+        <>
+          {/* Today's Deals section */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between px-3 mb-2">
+              <h2 className="font-display font-bold text-gray-800 text-base">
+                🔥 Today's Deals
+              </h2>
+              <button
+                type="button"
+                className="text-green-700 text-sm font-semibold"
+              >
+                See all ›
+              </button>
             </div>
-          ))}
-        </div>
+            <div className="flex gap-3 overflow-x-auto px-3 pb-1 scrollbar-hide">
+              {filtered.slice(0, 8).map((product: Product, idx: number) => (
+                <div
+                  key={product.id.toString()}
+                  data-ocid={`shop.product.item.${idx + 1}`}
+                >
+                  <ProductCard product={product} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Best Sellers Today section */}
+          {filtered.length > 1 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between px-3 mb-2">
+                <h2 className="font-display font-bold text-gray-800 text-base">
+                  ⭐ Best Sellers Today
+                </h2>
+                <button
+                  type="button"
+                  className="text-green-700 text-sm font-semibold"
+                >
+                  See all ›
+                </button>
+              </div>
+              <div className="flex gap-3 overflow-x-auto px-3 pb-1 scrollbar-hide">
+                {filtered
+                  .slice(0)
+                  .reverse()
+                  .slice(0, 8)
+                  .map((product: Product, idx: number) => (
+                    <div
+                      key={`bs-${product.id.toString()}`}
+                      data-ocid={`shop.bestseller.item.${idx + 1}`}
+                    >
+                      <ProductCard product={product} />
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Footer */}
-      <footer className="text-center py-4">
-        <p className="text-xs text-muted-foreground">
+      <footer className="text-center py-4 px-3">
+        <p className="text-xs text-gray-400">
           © {new Date().getFullYear()}.{" "}
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
