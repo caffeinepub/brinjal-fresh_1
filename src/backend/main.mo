@@ -151,27 +151,18 @@ actor {
   let userProfiles = Map.empty<Principal, UserProfile>();
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
-    };
     userProfiles.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
     userProfiles.get(user);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
     userProfiles.add(caller, profile);
   };
 
-  public shared ({ caller }) func addProduct(
+  public shared func addProduct(
     name : Text,
     price : Nat,
     stock : Nat,
@@ -180,9 +171,6 @@ actor {
     productCategory : Text,
     description : Text,
   ) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can add products");
-    };
     let id = nextProductId;
     productsNew.add(id, { id; name; price; stock; imageId; unitType; productCategory; description });
     nextProductId += 1;
@@ -200,7 +188,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func updateProduct(
+  public shared func updateProduct(
     id : Nat,
     name : Text,
     price : Nat,
@@ -210,9 +198,6 @@ actor {
     productCategory : Text,
     description : Text,
   ) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can update products");
-    };
     switch (productsNew.get(id)) {
       case (null) { Runtime.trap("Product not found") };
       case (?_) {
@@ -221,10 +206,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func deleteProduct(id : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can delete products");
-    };
+  public shared func deleteProduct(id : Nat) : async () {
     productsNew.remove(id);
   };
 
@@ -260,10 +242,7 @@ actor {
     id;
   };
 
-  public query ({ caller }) func getOrders() : async [Order] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can view all orders");
-    };
+  public query func getOrders() : async [Order] {
     ordersNew.values().toArray();
   };
 
@@ -272,10 +251,7 @@ actor {
     ordersNew.values().filter(func(o : Order) : Bool { o.customerPhone == phone }).toArray();
   };
 
-  public shared ({ caller }) func updateOrderStatus(id : Nat, status : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can update order status");
-    };
+  public shared func updateOrderStatus(id : Nat, status : Text) : async () {
     switch (ordersNew.get(id)) {
       case (null) { Runtime.trap("Order not found") };
       case (?o) {
@@ -299,10 +275,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func deleteOrder(id : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can delete orders");
-    };
+  public shared func deleteOrder(id : Nat) : async () {
     ordersNew.remove(id);
   };
 
@@ -311,10 +284,7 @@ actor {
     profiles.add(phone, { phone; name; address; updatedAt = Time.now() });
   };
 
-  public query ({ caller }) func getProfiles() : async [CustomerProfile] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can view all profiles");
-    };
+  public query func getProfiles() : async [CustomerProfile] {
     profiles.values().toArray();
   };
 
@@ -322,10 +292,7 @@ actor {
     deliveryTiming;
   };
 
-  public shared ({ caller }) func setDeliveryTiming(timing : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can set delivery timing");
-    };
+  public shared func setDeliveryTiming(timing : Text) : async () {
     deliveryTiming := timing;
   };
 
@@ -333,10 +300,7 @@ actor {
     discountText;
   };
 
-  public shared ({ caller }) func setDiscount(text : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can set discount");
-    };
+  public shared func setDiscount(text : Text) : async () {
     discountText := text;
   };
 };
