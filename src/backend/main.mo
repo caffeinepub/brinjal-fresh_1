@@ -140,6 +140,11 @@ actor {
   stable var deliveryTiming : Text = "10am - 6pm";
   stable var discountText : Text = "";
 
+  // Premium UI controls
+  stable var bannerEnabled : Bool = true;
+  stable var trustBadgesEnabled : Bool = true;
+  stable var bannerCustomText : Text = "Fresh Vegetables Daily";
+
   let productsNew = Map.empty<Nat, Product>();
   let ordersNew = Map.empty<Nat, Order>();
   let profiles = Map.empty<Text, CustomerProfile>();
@@ -302,5 +307,30 @@ actor {
 
   public shared func setDiscount(text : Text) : async () {
     discountText := text;
+  };
+
+  // Premium UI controls
+  public query func getBannerEnabled() : async Bool {
+    bannerEnabled;
+  };
+
+  public shared func setBannerEnabled(enabled : Bool) : async () {
+    bannerEnabled := enabled;
+  };
+
+  public query func getTrustBadgesEnabled() : async Bool {
+    trustBadgesEnabled;
+  };
+
+  public shared func setTrustBadgesEnabled(enabled : Bool) : async () {
+    trustBadgesEnabled := enabled;
+  };
+
+  public query func getBannerText() : async Text {
+    bannerCustomText;
+  };
+
+  public shared func setBannerText(text : Text) : async () {
+    bannerCustomText := text;
   };
 };

@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -38,6 +39,7 @@ import {
   Package,
   Pencil,
   Plus,
+  Settings,
   Tag,
   Trash2,
   Upload,
@@ -49,6 +51,8 @@ import type { CustomerProfile, Order, Product } from "../backend";
 import {
   parseDiscount,
   useAddProduct,
+  useBannerEnabled,
+  useBannerText,
   useDeleteOrder,
   useDeleteProduct,
   useDeliveryTiming,
@@ -56,6 +60,8 @@ import {
   useOrders,
   useProducts,
   useProfiles,
+  useSetBannerEnabled,
+  useSetBannerText,
   useSetDeliveryTiming,
   useSetDiscount,
   useUpdateOrderStatus,
@@ -885,12 +891,16 @@ function DiscountTab() {
   const [minimumAmount, setMinimumAmount] = useState("");
   const [flatAmount, setFlatAmount] = useState("");
   const [flatMinimum, setFlatMinimum] = useState("");
+  const [freeItem, setFreeItem] = useState("");
+  const [freeItemMinimum, setFreeItemMinimum] = useState("");
 
   const handleSave = async () => {
     const pct = Number(percentage);
     const min = Number(minimumAmount);
     const flat = Number(flatAmount);
     const flatMin = Number(flatMinimum);
+    const freeItemValue = freeItem;
+    const freeItemMinValue = freeItemMinimum;
     if (Number.isNaN(pct) || pct < 0 || pct > 100) {
       toast.error("Enter a valid percentage (0-100)");
       return;
@@ -907,6 +917,10 @@ function DiscountTab() {
       toast.error("Enter a valid flat discount minimum");
       return;
     }
+    if (freeItemMinValue && Number.isNaN(Number(freeItemMinValue))) {
+      toast.error("Enter a valid minimum amount for free item");
+      return;
+    }
     try {
       await setDiscount.mutateAsync(
         JSON.stringify({
@@ -914,6 +928,8 @@ function DiscountTab() {
           minimumAmount: min,
           flatAmount: flat,
           flatMinimum: flatMin,
+          freeItem: freeItemValue.trim(),
+          freeItemMinimum: Number(freeItemMinValue),
         }),
       );
       toast.success("Discount updated!");
@@ -921,6 +937,8 @@ function DiscountTab() {
       setMinimumAmount("");
       setFlatAmount("");
       setFlatMinimum("");
+      setFreeItem("");
+      setFreeItemMinimum("");
     } catch {
       toast.error("Failed to update discount");
     }
@@ -928,23 +946,29 @@ function DiscountTab() {
 
   return (
     <div className="space-y-4">
-      {parsed && (parsed.percentage > 0 || parsed.flatAmount > 0) && (
-        <div className="bg-accent/20 border border-accent/40 rounded-xl p-4 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground mb-1">
-            Current Discount
-          </p>
-          {parsed.percentage > 0 && (
-            <p className="font-display font-bold text-accent-foreground">
-              {parsed.percentage}% off on orders above ₹{parsed.minimumAmount}
+      {parsed &&
+        (parsed.percentage > 0 || parsed.flatAmount > 0 || parsed.freeItem) && (
+          <div className="bg-accent/20 border border-accent/40 rounded-xl p-4 space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-1">
+              Current Discount
             </p>
-          )}
-          {parsed.flatAmount > 0 && (
-            <p className="font-display font-bold text-accent-foreground">
-              ₹{parsed.flatAmount} off on orders above ₹{parsed.flatMinimum}
-            </p>
-          )}
-        </div>
-      )}
+            {parsed.percentage > 0 && (
+              <p className="font-display font-bold text-accent-foreground">
+                {parsed.percentage}% off on orders above ₹{parsed.minimumAmount}
+              </p>
+            )}
+            {parsed.flatAmount > 0 && (
+              <p className="font-display font-bold text-accent-foreground">
+                ₹{parsed.flatAmount} off on orders above ₹{parsed.flatMinimum}
+              </p>
+            )}
+            {parsed.freeItem && (
+              <p className="font-display font-bold text-accent-foreground">
+                FREE {parsed.freeItem} on orders above ₹{parsed.freeItemMinimum}
+              </p>
+            )}
+          </div>
+        )}
 
       <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
         Percentage Discount
@@ -1007,7 +1031,39 @@ function DiscountTab() {
         />
       </div>
 
-      {(percentage || flatAmount) && (
+      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+        Free Item Offer
+      </p>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">Free Item Description</Label>
+        <Input
+          data-ocid="admin.discount.input"
+          placeholder={parsed?.freeItem ? parsed.freeItem : "e.g. 1 kg Tomato"}
+          value={freeItem}
+          onChange={(e) => setFreeItem(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold">
+          Minimum Order for Free Item (₹)
+        </Label>
+        <Input
+          data-ocid="admin.discount.input"
+          type="number"
+          placeholder={
+            parsed
+              ? String(parsed.freeItemMinimum || "") || "e.g. 500"
+              : "e.g. 500"
+          }
+          value={freeItemMinimum}
+          onChange={(e) => setFreeItemMinimum(e.target.value)}
+          min="0"
+        />
+      </div>
+
+      {(percentage || flatAmount || freeItem) && (
         <div className="bg-secondary/60 rounded-lg px-3 py-2 text-xs text-muted-foreground space-y-0.5">
           {percentage && minimumAmount && (
             <p>
@@ -1019,6 +1075,12 @@ function DiscountTab() {
             <p>
               Preview: Customers get <strong>₹{flatAmount}</strong> off on
               orders above ₹{flatMinimum}
+            </p>
+          )}
+          {freeItem && freeItemMinimum && (
+            <p>
+              Preview: Customers get <strong>FREE {freeItem}</strong> on orders
+              above ₹{freeItemMinimum}
             </p>
           )}
         </div>
@@ -1086,6 +1148,108 @@ function ProfilesTab() {
   );
 }
 
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
+function SettingsTab() {
+  const { data: bannerEnabled } = useBannerEnabled();
+  const { data: bannerText } = useBannerText();
+
+  const setBannerEnabled = useSetBannerEnabled();
+  const setBannerText = useSetBannerText();
+
+  const [bannerHeadline, setBannerHeadline] = useState("");
+
+  // Sync input when data loads
+  useEffect(() => {
+    if (bannerText && !bannerHeadline) {
+      setBannerHeadline(bannerText);
+    }
+  }, [bannerText, bannerHeadline]);
+
+  const handleSaveBannerText = async () => {
+    if (!bannerHeadline.trim()) {
+      toast.error("Please enter banner headline text");
+      return;
+    }
+    try {
+      await setBannerText.mutateAsync(bannerHeadline.trim());
+      toast.success("Banner text updated!");
+    } catch {
+      toast.error("Failed to update banner text");
+    }
+  };
+
+  const handleBannerToggle = async (checked: boolean) => {
+    try {
+      await setBannerEnabled.mutateAsync(checked);
+      toast.success(checked ? "Hero banner enabled" : "Hero banner hidden");
+    } catch {
+      toast.error("Failed to update setting");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-card rounded-xl p-4 shadow-xs space-y-4">
+        <h3 className="font-display font-bold text-sm text-foreground">
+          Homepage Display
+        </h3>
+
+        {/* Hero Banner Toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Show Hero Banner
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Sliding banner at the top of the homepage
+            </p>
+          </div>
+          <Switch
+            data-ocid="admin.settings.toggle"
+            checked={bannerEnabled !== false}
+            onCheckedChange={handleBannerToggle}
+            disabled={setBannerEnabled.isPending}
+          />
+        </div>
+      </div>
+
+      {/* Banner Headline Text */}
+      <div className="bg-card rounded-xl p-4 shadow-xs space-y-3">
+        <h3 className="font-display font-bold text-sm text-foreground">
+          Banner Headline Text
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Custom text shown on the first slide of the hero banner
+        </p>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold">Headline Text</Label>
+          <Input
+            data-ocid="admin.settings.input"
+            placeholder="e.g. Fresh Vegetables Daily"
+            value={bannerHeadline}
+            onChange={(e) => setBannerHeadline(e.target.value)}
+            maxLength={50}
+          />
+        </div>
+        <Button
+          data-ocid="admin.settings.save_button"
+          className="w-full font-bold"
+          onClick={handleSaveBannerText}
+          disabled={setBannerText.isPending}
+        >
+          {setBannerText.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+            </>
+          ) : (
+            "Save Banner Text"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 interface AdminPageProps {
   onClose: () => void;
@@ -1140,7 +1304,7 @@ export default function AdminPage({ onClose }: AdminPageProps) {
 
       <div className="px-3 py-4">
         <Tabs defaultValue="products">
-          <TabsList className="w-full grid grid-cols-5 mb-4">
+          <TabsList className="w-full grid grid-cols-6 mb-4">
             <TabsTrigger
               data-ocid="admin.products.tab"
               value="products"
@@ -1176,6 +1340,14 @@ export default function AdminPage({ onClose }: AdminPageProps) {
             >
               Profiles
             </TabsTrigger>
+            <TabsTrigger
+              data-ocid="admin.settings.tab"
+              value="settings"
+              className="text-[10px]"
+            >
+              <Settings className="w-3 h-3 mr-0.5" />
+              Settings
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="products">
@@ -1192,6 +1364,9 @@ export default function AdminPage({ onClose }: AdminPageProps) {
           </TabsContent>
           <TabsContent value="profiles">
             <ProfilesTab />
+          </TabsContent>
+          <TabsContent value="settings">
+            <SettingsTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -284,7 +284,7 @@ function AppContent() {
             >
               <User className="w-5 h-5" />
               <span className="text-[10px] font-display font-semibold">
-                Profile
+                Account
               </span>
             </button>
           </div>

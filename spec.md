@@ -1,44 +1,59 @@
 # Brinjal Fresh Store
 
 ## Current State
-- Bottom navigation: Shop, Cart, Admin (3 tabs)
-- Admin tab visible to all users, password-protected
-- Products have `category` field (unit type: kg/piece/bundle/packet)
-- Orders stored with status field (not controlled by admin)
-- No customer order tracking page
-- No customer profile page
-- No product category (Vegetables/Fruits/etc.)
-- No customer profiles view in admin
+
+- **Hero banner** (3 slides): slide 1 = custom text, slide 2 = delivery timing, slide 3 = discount
+- **Separate FREE DELIVERY banner**: a dedicated green-to-orange gradient strip always shown below the hero
+- **Separate discount banner**: an orange strip shown below if discount is active
+- **Separate delivery timing banner**: a white strip shown below if timing is set
+- **Trust badges strip**: a horizontal row (Fresh Daily, Free Delivery, Same Day, Quality Guaranteed) shown below category pills
+- **Discount tab in Admin**: supports percentage discount + flat amount discount (stored as JSON string in `discountText` stable var)
+- **Settings tab in Admin**: toggle hero banner, toggle trust badges, set banner headline text
+- The `discountText` stable backend var stores a JSON string with fields: `percentage`, `minimumAmount`, `flatAmount`, `flatMinimum`
+- `parseDiscount()` in useQueries.ts parses that JSON
 
 ## Requested Changes (Diff)
 
 ### Add
-- New bottom navigation with 5 tabs: Home, Categories, Cart, Order, Profile
-- CategoriesPage: filter products by 5 categories (Vegetables, Fruits, Leafy Vegetables, Root Vegetables, Combo Pack)
-- OrderPage: customer sees only their own orders by phone number (stored in localStorage), with status labels (Processing/Delivered/Cancelled)
-- ProfilePage: customer name, phone, address auto-filled after first order, editable; saved in localStorage and backend
-- `productCategory` field on Product (Vegetables/Fruits/Leafy Vegetables/Root Vegetables/Combo Pack)
-- Admin > Products: new dropdown for productCategory when adding/editing products
-- Admin > Orders: status dropdown per order (Processing/Delivered/Cancelled) controlled by admin
-- Admin > Profiles tab: admin can view all customer profiles (name, phone, address)
-- Backend: `saveProfile(name, phone, address)` and `getProfiles()` APIs
-- Backend: `getOrdersByPhone(phone)` query for customer order lookup
+- New **"Free Item" discount option** in Admin Discount tab: admin can set a free item description (e.g. "1 kg Tomato") and a minimum order amount. When the order reaches the minimum, the free item offer is shown in the cart/checkout and in the hero banner.
+- Hero banner now shows Free Delivery message merged into slide content (the separate Free Delivery banner is removed, so hero slide 3 or a dedicated slide handles it)
+- Hero banner slide for delivery timing (already exists, keep)
+- Hero banner slide for discount or free item offer (already exists, extend to include free item)
 
 ### Modify
-- Bottom navigation: replace Shop/Cart/Admin with Home/Categories/Cart/Order/Profile
-- Admin panel: no longer accessible via bottom nav; hidden behind search box (type "admin panel" to open)
-- Admin > Products: add productCategory field to add/edit form
-- Order status set by admin; reflected immediately to customer in Order tab
+- **Remove separate FREE DELIVERY banner** (the green-to-orange gradient strip with Truck icon) from ShopPage
+- **Remove separate discount banner** (orange Tag strip) from ShopPage
+- **Remove separate delivery timing banner** (white strip with truck emoji) from ShopPage
+- **Remove trust badges strip** (TrustBadgesStrip component and its render in ShopPage)
+- **Hero banner slides** updated: slide 1 = custom headline (from admin), slide 2 = delivery timing, slide 3 = Free Delivery highlight + discount/free item offer combined
+- **Admin Discount tab**: add a third section "Free Item Offer" with two fields: free item description (text) and minimum order amount (number)
+- **Admin Settings tab**: remove trust badges toggle (since trust badges are removed entirely)
+- **`parseDiscount()`**: extend to also parse `freeItem` and `freeItemMinimum` fields
+- **Cart/KartPage**: show the free item offer text when subtotal meets the free item minimum
 
 ### Remove
-- Admin tab from bottom navigation
+- `TrustBadgesStrip` component (frontend only)
+- The render of trust badges in ShopPage (`{showTrustBadges && <TrustBadgesStrip />}`)
+- The separate FREE DELIVERY banner div in ShopPage
+- The separate discount banner div in ShopPage
+- The separate delivery timing div in ShopPage
+- Trust badges toggle from Admin Settings tab
+- `useTrustBadgesEnabled` and `useSetTrustBadgesEnabled` hooks (can keep or just not render - keep to avoid breaking backend, just don't render UI)
 
 ## Implementation Plan
-1. Update backend: add `productCategory` to Product type, add CustomerProfile type with save/get APIs, add `getOrdersByPhone` query, keep `updateOrderStatus` as-is
-2. Update frontend App.tsx: 5-tab nav (Home/Categories/Cart/Order/Profile), admin accessible via search
-3. Create CategoriesPage with product filtering by category
-4. Create OrderPage: reads phone from localStorage, fetches orders filtered by phone, shows status
-5. Create ProfilePage: localStorage-backed profile, pre-fills checkout form, editable
-6. Update AdminPage: add Profiles tab, add order status control in Orders tab, add productCategory to Products tab
-7. Update ShopPage: intercept "admin panel" search to open admin, pass productCategory to add/edit product
-8. Update KartContext/KartPage: save phone to localStorage after order placed
+
+1. **Update `parseDiscount()`** in `useQueries.ts` to also return `freeItem: string` and `freeItemMinimum: number`
+2. **Update `ShopPage.tsx`**:
+   - Remove `TrustBadgesStrip` component
+   - Remove trust badges render
+   - Remove FREE DELIVERY banner block
+   - Remove discount banner block
+   - Remove delivery timing banner block
+   - Update `HeroBanner` slides: slide 1 = headline, slide 2 = delivery timing (as before), slide 3 = shows Free Delivery + discount info + free item offer combined
+3. **Update `AdminPage.tsx` DiscountTab**:
+   - Add "Free Item Offer" section with `freeItem` text input and `freeItemMinimum` number input
+   - Include `freeItem` and `freeItemMinimum` in the JSON saved to backend
+   - Show current free item in the "Current Discount" summary
+4. **Update `AdminPage.tsx` SettingsTab**: remove trust badges toggle
+5. **Update `KartPage.tsx`**: show free item offer banner when subtotal meets `freeItemMinimum`
+6. No backend Motoko changes needed - `discountText` already stores arbitrary JSON, just add new fields to the JSON payload

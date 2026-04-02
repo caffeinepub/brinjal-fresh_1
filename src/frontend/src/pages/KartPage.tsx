@@ -240,8 +240,41 @@ export default function KartPage() {
                 {discount.flatAmount} off
               </p>
             )}
+            {discount.freeItem &&
+              discount.freeItemMinimum > 0 &&
+              (subtotal >= discount.freeItemMinimum ? (
+                <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-1">
+                  <span className="text-sm">🎁</span>
+                  <p className="text-xs font-bold text-green-700">
+                    You get FREE {discount.freeItem} with this order!
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Add ₹{discount.freeItemMinimum - subtotal} more to get FREE{" "}
+                  {discount.freeItem}
+                </p>
+              ))}
           </>
         )}
+        {/* Show free item notice even when other discounts are applied */}
+        {discount &&
+          discountAmount > 0 &&
+          discount.freeItem &&
+          discount.freeItemMinimum > 0 &&
+          (subtotal >= discount.freeItemMinimum ? (
+            <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <span className="text-sm">🎁</span>
+              <p className="text-xs font-bold text-green-700">
+                You get FREE {discount.freeItem} with this order!
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Add ₹{discount.freeItemMinimum - subtotal} more to get FREE{" "}
+              {discount.freeItem}
+            </p>
+          ))}
         <Separator />
         <div className="flex justify-between font-bold">
           <span>Total</span>

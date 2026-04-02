@@ -82,6 +82,103 @@ export function useProfiles() {
   });
 }
 
+export function useBannerEnabled() {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ["bannerEnabled"],
+    queryFn: async () => {
+      if (!actor) return true;
+      try {
+        return await (actor as any).getBannerEnabled();
+      } catch {
+        return true;
+      }
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useTrustBadgesEnabled() {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ["trustBadgesEnabled"],
+    queryFn: async () => {
+      if (!actor) return true;
+      try {
+        return await (actor as any).getTrustBadgesEnabled();
+      } catch {
+        return true;
+      }
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useBannerText() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string>({
+    queryKey: ["bannerText"],
+    queryFn: async () => {
+      if (!actor) return "Fresh Vegetables Daily";
+      try {
+        const text = await (actor as any).getBannerText();
+        return text || "Fresh Vegetables Daily";
+      } catch {
+        return "Fresh Vegetables Daily";
+      }
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useSetBannerEnabled() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).setBannerEnabled(enabled);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bannerEnabled"] });
+    },
+  });
+}
+
+export function useSetTrustBadgesEnabled() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).setTrustBadgesEnabled(enabled);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trustBadgesEnabled"] });
+    },
+  });
+}
+
+export function useSetBannerText() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (text: string) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).setBannerText(text);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bannerText"] });
+    },
+  });
+}
+
 export function usePlaceOrder() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -281,6 +378,8 @@ export function parseDiscount(raw: string): {
   minimumAmount: number;
   flatAmount: number;
   flatMinimum: number;
+  freeItem: string;
+  freeItemMinimum: number;
 } | null {
   try {
     if (!raw) return null;
@@ -296,6 +395,11 @@ export function parseDiscount(raw: string): {
           typeof parsed.flatAmount === "number" ? parsed.flatAmount : 0,
         flatMinimum:
           typeof parsed.flatMinimum === "number" ? parsed.flatMinimum : 0,
+        freeItem: typeof parsed.freeItem === "string" ? parsed.freeItem : "",
+        freeItemMinimum:
+          typeof parsed.freeItemMinimum === "number"
+            ? parsed.freeItemMinimum
+            : 0,
       };
     }
     return null;

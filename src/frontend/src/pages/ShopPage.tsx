@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { Barcode, Mic, Plus, Search, Tag, Truck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Barcode, ChevronRight, Mic, Plus, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Product } from "../backend";
 import {
@@ -11,12 +11,15 @@ import {
 } from "../context/KartContext";
 import {
   parseDiscount,
+  useBannerEnabled,
+  useBannerText,
   useDeliveryTiming,
   useDiscount,
   useProducts,
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
 
+// ─── Product Image ─────────────────────────────────────────────────────────────
 function ProductImage({ imageId }: { imageId: string }) {
   const storageClient = useStorageClient();
   const [url, setUrl] = useState<string | null>(null);
@@ -43,6 +46,30 @@ function ProductImage({ imageId }: { imageId: string }) {
   );
 }
 
+// ─── Tiny Product Image ────────────────────────────────────────────────────────
+function TinyProductImage({ imageId }: { imageId: string }) {
+  const storageClient = useStorageClient();
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageId || !storageClient) return;
+    storageClient
+      .getDirectURL(imageId)
+      .then(setUrl)
+      .catch(() => setUrl(null));
+  }, [imageId, storageClient]);
+
+  if (!url) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <span className="text-2xl">🥦</span>
+      </div>
+    );
+  }
+  return <img src={url} alt="product" className="w-full h-full object-cover" />;
+}
+
+// ─── Quantity Buttons ─────────────────────────────────────────────────────────
 function QuantityButtons({
   options,
   selected,
@@ -64,10 +91,10 @@ function QuantityButtons({
           onClick={() => onSelect(opt)}
           className={`flex-1 ${
             tiny ? "text-[8px]" : "text-[10px]"
-          } font-bold py-1 px-0.5 rounded-lg border transition-colors ${
+          } font-bold py-1 px-0.5 rounded-lg border transition-all duration-150 ${
             selected === opt
-              ? "bg-green-700 text-white border-green-700"
-              : "bg-white text-gray-600 border-gray-300"
+              ? "bg-green-700 text-white border-green-700 scale-105 shadow-sm"
+              : "bg-white text-gray-600 border-gray-300 hover:border-green-400"
           }`}
         >
           {opt}
@@ -77,6 +104,7 @@ function QuantityButtons({
   );
 }
 
+// ─── Product Card ──────────────────────────────────────────────────────────────
 /** compact = normal row card (w-44), tiny = first row small card (3 visible at once) */
 function ProductCard({
   product,
@@ -101,20 +129,31 @@ function ProductCard({
     toast.success(`${name} added to kart!`);
   };
 
-  // tiny = small cards, 3 visible at once in first row
   const widthClass = tiny
-    ? "w-[29vw] min-w-[100px] max-w-[120px] shrink-0"
+    ? "w-[30vw] min-w-[95px] max-w-[115px] shrink-0"
     : compact
       ? "w-44 shrink-0"
       : "";
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-md overflow-hidden flex flex-col border border-gray-100 ${widthClass}`}
+      className={`bg-white rounded-xl shadow-md overflow-hidden flex flex-col border border-gray-100 transition-all duration-200 ${widthClass}`}
     >
       {/* Product image */}
       <div className="relative rounded-t-xl overflow-hidden">
-        <ProductImage imageId={product.imageId} />
+        {tiny ? (
+          <div className="w-full aspect-[4/3] bg-green-50 overflow-hidden">
+            {product.imageId ? (
+              <TinyProductImage imageId={product.imageId} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-2xl">🥦</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <ProductImage imageId={product.imageId} />
+        )}
         {!inStock && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <span className="text-white text-[9px] font-bold bg-red-500 px-1.5 py-0.5 rounded">
@@ -177,6 +216,172 @@ function ProductCard({
   );
 }
 
+// ─── Hero Banner ───────────────────────────────────────────────────────────────
+function HeroBanner({
+  bannerText,
+  deliveryTiming,
+  discount,
+}: {
+  bannerText: string;
+  deliveryTiming: string;
+  discount: ReturnType<typeof parseDiscount>;
+}) {
+  const [slide, setSlide] = useState(0);
+
+  // Build discount label for slide 4
+  let discountSlide: {
+    emoji: string;
+    headline: string;
+    sub: string;
+    gradient: string;
+  } | null = null;
+  if (discount) {
+    const hasDiscount =
+      discount.percentage > 0 ||
+      discount.flatAmount > 0 ||
+      discount.freeItem !== "";
+    if (hasDiscount) {
+      let headline = "";
+      if (discount.freeItem && discount.freeItemMinimum > 0) {
+        headline = `FREE ${discount.freeItem} on orders above ₹${discount.freeItemMinimum}`;
+      } else if (discount.percentage > 0) {
+        headline = `${discount.percentage}% OFF on orders above ₹${discount.minimumAmount}`;
+      } else if (discount.flatAmount > 0) {
+        headline = `₹${discount.flatAmount} OFF on orders above ₹${discount.flatMinimum}`;
+      }
+      discountSlide = {
+        emoji: "🎉",
+        headline,
+        sub: "Special Offer Just For You",
+        gradient:
+          "linear-gradient(135deg, #5c1a00 0%, #b03000 60%, #e84800 100%)",
+      };
+    }
+  }
+
+  const slides = [
+    {
+      emoji: "🥦",
+      headline: bannerText || "Fresh Vegetables Daily",
+      sub: "Order Now for Same Day Delivery",
+      gradient:
+        "linear-gradient(135deg, #0d4a1a 0%, #1a7a30 60%, #2ea84a 100%)",
+    },
+    {
+      emoji: "🚚",
+      headline: "Free Delivery on Every Order",
+      sub: "No minimum order required",
+      gradient:
+        "linear-gradient(135deg, #1a3a5c 0%, #1e5f99 60%, #2980cc 100%)",
+    },
+    {
+      emoji: "⏰",
+      headline: deliveryTiming || "Fast Delivery",
+      sub: "Today's Delivery Timing",
+      gradient:
+        "linear-gradient(135deg, #0a3d1f 0%, #145c30 60%, #1e7a40 100%)",
+    },
+    ...(discountSlide ? [discountSlide] : []),
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSlide((prev) => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  // Clamp slide index if slides length changed
+  const currentSlideIdx = slide % slides.length;
+  const current = slides[currentSlideIdx];
+
+  return (
+    <div
+      data-ocid="shop.hero.panel"
+      className="mx-3 mb-3 rounded-2xl overflow-hidden shadow-lg relative"
+      style={{ height: 130 }}
+    >
+      {/* Slide content */}
+      <div
+        className="absolute inset-0 flex flex-col items-start justify-center px-5 transition-all duration-500"
+        style={{ background: current.gradient }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-3xl">{current.emoji}</span>
+          <div>
+            <p className="text-white font-black text-base leading-snug drop-shadow">
+              {current.headline}
+            </p>
+            <p className="text-white/80 text-[11px] font-semibold">
+              {current.sub}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Dot indicators */}
+      <div className="absolute bottom-2.5 right-3 flex gap-1.5">
+        {slides.map((slideItem, i) => (
+          <button
+            key={slideItem.headline}
+            type="button"
+            aria-label={`Slide ${i + 1}`}
+            onClick={() => setSlide(i)}
+            className={`rounded-full transition-all duration-300 ${
+              currentSlideIdx === i ? "w-4 h-2 bg-white" : "w-2 h-2 bg-white/50"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Category Pill Strip ───────────────────────────────────────────────────────
+function CategoryPillStrip({
+  onPillClick,
+}: {
+  onPillClick: (key: string) => void;
+}) {
+  const [active, setActive] = useState("");
+
+  const pills = [
+    { key: "vegetables", label: "🥦 Vegetables" },
+    { key: "leafy", label: "🍃 Leafy Veg" },
+    { key: "combo", label: "📦 Combo Pack" },
+    { key: "fruits", label: "🍎 Fruits" },
+    { key: "roots", label: "🥕 Root Veg" },
+  ];
+
+  const handleClick = (key: string) => {
+    setActive(key === active ? "" : key);
+    onPillClick(key);
+  };
+
+  return (
+    <div className="px-3 mb-3">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {pills.map((pill) => (
+          <button
+            key={pill.key}
+            type="button"
+            data-ocid="shop.filter.tab"
+            onClick={() => handleClick(pill.key)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border-2 transition-all duration-200 ${
+              active === pill.key
+                ? "bg-green-700 text-white border-green-700 shadow-sm"
+                : "bg-white text-green-800 border-green-300 hover:border-green-500"
+            }`}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Category Images ───────────────────────────────────────────────────────────
 const CATEGORIES = [
   {
     label: "Vegetables",
@@ -206,71 +411,82 @@ const CATEGORIES = [
   },
 ];
 
-const CATEGORY_ROW_CONFIG = [
-  { key: "vegetables", emoji: "🥦", label: "Vegetables" },
-  { key: "fruits", emoji: "🍎", label: "Fruits" },
-  { key: "leafy", emoji: "🌿", label: "Leafy Vegetables" },
-  { key: "roots", emoji: "🥕", label: "Root Vegetables" },
-  { key: "combo", emoji: "📦", label: "Combo Pack" },
-];
-
+// ─── Product Row Types ─────────────────────────────────────────────────────────
 interface ProductRow {
   label: string;
+  categoryKey: string;
   products: Product[];
   isFirst?: boolean;
 }
 
 function buildProductRows(filtered: Product[]): ProductRow[] {
-  const byCategory: Record<string, Product[]> = {};
-  for (const cfg of CATEGORY_ROW_CONFIG) {
-    byCategory[cfg.key] = [];
-  }
+  const vegetables: Product[] = [];
+  const fruits: Product[] = [];
+  const leafy: Product[] = [];
+  const roots: Product[] = [];
+  const combo: Product[] = [];
 
   for (const p of filtered) {
     const cat = (p.productCategory || "").toLowerCase();
-    let matched = false;
-    for (const cfg of CATEGORY_ROW_CONFIG) {
-      if (cat.includes(cfg.key)) {
-        byCategory[cfg.key].push(p);
-        matched = true;
-        break;
-      }
-    }
-    if (!matched) {
-      byCategory.vegetables.push(p);
+    if (cat.includes("fruit")) {
+      fruits.push(p);
+    } else if (cat.includes("leafy")) {
+      leafy.push(p);
+    } else if (cat.includes("root")) {
+      roots.push(p);
+    } else if (cat.includes("combo")) {
+      combo.push(p);
+    } else {
+      vegetables.push(p);
     }
   }
 
   const rows: ProductRow[] = [];
-  const vegetables = byCategory.vegetables;
-  const fruits = byCategory.fruits;
+
+  if (vegetables.length > 0) {
+    const half = Math.ceil(vegetables.length / 2);
+    rows.push({
+      label: "🥦 Fresh Vegetables",
+      categoryKey: "vegetables",
+      products: vegetables.slice(0, half),
+    });
+    if (vegetables.length > half) {
+      rows.push({
+        label: "🥦 Fresh Vegetables",
+        categoryKey: "vegetables",
+        products: vegetables.slice(half),
+      });
+    }
+  }
+
+  if (leafy.length > 0) {
+    rows.push({
+      label: "🌿 Leafy Vegetables",
+      categoryKey: "leafy",
+      products: leafy,
+    });
+  }
+
+  if (combo.length > 0) {
+    rows.push({
+      label: "📦 Combo Pack",
+      categoryKey: "combo",
+      products: combo,
+    });
+  }
 
   if (fruits.length > 0) {
-    if (vegetables.length > 0) {
-      rows.push({ label: "🥦 Vegetables", products: vegetables });
-    }
-    rows.push({ label: "🍎 Fruits", products: fruits });
-  } else {
-    if (vegetables.length > 0) {
-      const half = Math.ceil(vegetables.length / 2);
-      rows.push({
-        label: "🥦 Vegetables",
-        products: vegetables.slice(0, half),
-      });
-      if (vegetables.length > half) {
-        rows.push({ label: "🥦 Vegetables", products: vegetables.slice(half) });
-      }
-    }
+    rows.push({ label: "🍎 Fruits", categoryKey: "fruits", products: fruits });
   }
 
-  for (const cfg of CATEGORY_ROW_CONFIG.slice(2)) {
-    const items = byCategory[cfg.key];
-    if (items.length > 0) {
-      rows.push({ label: `${cfg.emoji} ${cfg.label}`, products: items });
-    }
+  if (roots.length > 0) {
+    rows.push({
+      label: "🥕 Root Vegetables",
+      categoryKey: "roots",
+      products: roots,
+    });
   }
 
-  // Mark first row
   if (rows.length > 0) {
     rows[0] = { ...rows[0], isFirst: true };
   }
@@ -278,6 +494,7 @@ function buildProductRows(filtered: Product[]): ProductRow[] {
   return rows;
 }
 
+// ─── Shop Page ─────────────────────────────────────────────────────────────────
 interface ShopPageProps {
   onOpenAdmin: () => void;
 }
@@ -288,8 +505,25 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
   const { data: products, isLoading } = useProducts();
   const { data: deliveryTiming } = useDeliveryTiming();
   const { data: discountRaw } = useDiscount();
+  const { data: bannerEnabled } = useBannerEnabled();
+  const { data: bannerText } = useBannerText();
 
   const discount = parseDiscount(discountRaw ?? "");
+
+  // Refs for category pill scroll navigation
+  const vegetablesRef = useRef<HTMLDivElement>(null);
+  const leafyRef = useRef<HTMLDivElement>(null);
+  const comboRef = useRef<HTMLDivElement>(null);
+  const fruitsRef = useRef<HTMLDivElement>(null);
+  const rootsRef = useRef<HTMLDivElement>(null);
+
+  const categoryRefs: Record<string, React.RefObject<HTMLDivElement | null>> = {
+    vegetables: vegetablesRef,
+    leafy: leafyRef,
+    combo: comboRef,
+    fruits: fruitsRef,
+    roots: rootsRef,
+  };
 
   const handleSearchChange = (value: string) => {
     if (value.toLowerCase().trim() === "admin panel") {
@@ -298,6 +532,13 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
       return;
     }
     setSearch(value);
+  };
+
+  const handlePillClick = (key: string) => {
+    const ref = categoryRefs[key];
+    if (ref?.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   const filtered = (products ?? []).filter((p: Product) => {
@@ -309,6 +550,9 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
   });
 
   const productRows = buildProductRows(filtered);
+
+  // Determine if banner should show (default true if data not loaded yet)
+  const showBanner = bannerEnabled !== false;
 
   return (
     <div className="pb-4">
@@ -336,53 +580,17 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
         </div>
       </div>
 
-      {/* FREE DELIVERY BANNER */}
-      <div className="mx-3 mb-3 rounded-2xl overflow-hidden shadow-md">
-        <div
-          className="flex items-center gap-3 px-4 py-3"
-          style={{
-            background:
-              "linear-gradient(90deg, #1a5c2a 0%, #2e7d32 60%, #f97316 100%)",
-          }}
-        >
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">
-            <Truck className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1">
-            <p className="text-white font-black text-base leading-tight uppercase tracking-wide">
-              🎉 FREE DELIVERY
-            </p>
-            <p className="text-green-100 text-[11px] font-semibold">
-              On every order • Fast & Fresh
-            </p>
-          </div>
-          <span className="bg-white text-green-800 font-black text-[10px] px-2 py-1 rounded-full uppercase">
-            FREE
-          </span>
-        </div>
-      </div>
-
-      {/* Discount banner if active */}
-      {discount && (discount.percentage > 0 || discount.flatAmount > 0) && (
-        <div className="mx-3 mb-2 rounded-xl bg-orange-50 border border-orange-200 flex items-center gap-2 px-3 py-2">
-          <Tag className="w-4 h-4 text-orange-500 shrink-0" />
-          <span className="text-orange-700 text-xs font-bold">
-            {discount.percentage > 0
-              ? `${discount.percentage}% off on orders above ₹${discount.minimumAmount}`
-              : `₹${discount.flatAmount} off on orders above ₹${discount.flatMinimum}`}
-          </span>
-        </div>
+      {/* Hero Sliding Banner */}
+      {showBanner && (
+        <HeroBanner
+          bannerText={bannerText ?? "Fresh Vegetables Daily"}
+          deliveryTiming={deliveryTiming ?? ""}
+          discount={discount}
+        />
       )}
 
-      {/* Delivery timing */}
-      {deliveryTiming && (
-        <div className="mx-3 mb-2 rounded-xl bg-white border border-gray-100 flex items-center gap-2 px-3 py-2 shadow-xs">
-          <span className="text-sm">🚚</span>
-          <span className="text-orange-600 text-xs font-bold">
-            {deliveryTiming}
-          </span>
-        </div>
-      )}
+      {/* Category Pill Strip */}
+      <CategoryPillStrip onPillClick={handlePillClick} />
 
       {/* Category tiles */}
       <div className="px-3 mb-3">
@@ -447,36 +655,55 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
         </div>
       ) : (
         <div className="px-3 flex flex-col gap-4">
-          {productRows.map((row, idx) => (
-            <div key={`${row.label}-${idx}`}>
-              <h2 className="font-display font-bold text-gray-800 text-sm mb-2">
-                {row.label}
-              </h2>
-              {row.isFirst ? (
-                // First row: small cards, exactly 3 visible at a time
-                <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-                  {row.products.map((product: Product) => (
-                    <ProductCard
-                      key={product.id.toString()}
-                      product={product}
-                      tiny
-                    />
-                  ))}
+          {productRows.map((row, idx) => {
+            // Assign ref based on the first occurrence of each category key
+            const isFirstOfKey =
+              idx ===
+              productRows.findIndex((r) => r.categoryKey === row.categoryKey);
+            const ref = isFirstOfKey
+              ? categoryRefs[row.categoryKey]
+              : undefined;
+
+            return (
+              <div key={`${row.label}-${idx}`} ref={ref}>
+                {/* Section title with See All */}
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-bold text-gray-800 text-sm">
+                    {row.label}
+                  </h2>
+                  <button
+                    type="button"
+                    className="flex items-center gap-0.5 text-green-700 text-[11px] font-bold"
+                  >
+                    See All
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
-              ) : (
-                // Remaining rows: normal compact cards
-                <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide">
-                  {row.products.map((product: Product) => (
-                    <ProductCard
-                      key={product.id.toString()}
-                      product={product}
-                      compact
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+
+                {row.isFirst ? (
+                  <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+                    {row.products.map((product: Product) => (
+                      <ProductCard
+                        key={product.id.toString()}
+                        product={product}
+                        tiny
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide">
+                    {row.products.map((product: Product) => (
+                      <ProductCard
+                        key={product.id.toString()}
+                        product={product}
+                        compact
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
