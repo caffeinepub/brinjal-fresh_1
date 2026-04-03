@@ -15,7 +15,6 @@ import {
   useBannerText,
   useDeliveryTiming,
   useDiscount,
-  useMinimumOrder,
   useProducts,
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
@@ -217,21 +216,121 @@ function ProductCard({
   );
 }
 
+// ─── Horizontal Product Card (second row) ─────────────────────────────────────
+/** Vertical card: image on TOP, details BOTTOM. 2 visible at a time. */
+function HorizontalProductCard({ product }: { product: Product }) {
+  const { addToKart } = useKart();
+
+  const unitType = product.unitType || (product as any).category || "kg";
+  const options = getQuantityOptions(unitType);
+  const [selectedOption, setSelectedOption] = useState(options[0]);
+
+  const basePrice = Number(product.price);
+  const unitLabel = getUnitLabel(unitType);
+  const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
+  const name = product.name || "";
+  const inStock = Number(product.stock) > 0;
+  const description = (product as any).description || "";
+
+  const handleAdd = () => {
+    if (!inStock) return;
+    addToKart(product, selectedOption);
+    toast.success(`${name} added to kart!`);
+  };
+
+  return (
+    <div
+      className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col border border-gray-100 shrink-0"
+      style={{ width: "calc(50vw - 18px)", minWidth: 150, maxWidth: 200 }}
+    >
+      {/* Top: image */}
+      <div
+        className="relative w-full overflow-hidden bg-green-50"
+        style={{ height: 110 }}
+      >
+        {product.imageId ? (
+          <TinyProductImage imageId={product.imageId} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-3xl">🥦</span>
+          </div>
+        )}
+        {!inStock && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="text-white text-[9px] font-bold bg-red-500 px-1.5 py-0.5 rounded">
+              Out of Stock
+            </span>
+          </div>
+        )}
+      </div>
+      {/* Bottom: details */}
+      <div className="flex-1 p-2 flex flex-col gap-1 min-w-0">
+        <h3 className="font-bold text-gray-800 text-[11px] leading-tight line-clamp-1">
+          {name}
+        </h3>
+        {description ? (
+          <p className="text-gray-500 text-[9px] leading-tight line-clamp-2">
+            {description}
+          </p>
+        ) : null}
+        <div className="flex items-baseline gap-0.5">
+          <span className="text-red-600 font-black text-base leading-none">
+            ₹{basePrice}
+          </span>
+          <span className="text-gray-500 text-[9px] font-semibold">
+            {unitLabel}
+          </span>
+        </div>
+        {/* Qty buttons */}
+        <div className="flex gap-0.5">
+          {options.slice(0, 3).map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setSelectedOption(opt)}
+              className={`flex-1 text-[9px] font-bold py-0.5 rounded border transition-all ${
+                selectedOption === opt
+                  ? "bg-green-700 text-white border-green-700"
+                  : "bg-white text-gray-600 border-gray-300"
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+        {/* Price + Add */}
+        <div className="flex items-center gap-1 mt-auto">
+          <span className="text-red-500 font-black text-sm leading-none shrink-0">
+            ₹{calculatedPrice}
+          </span>
+          <button
+            type="button"
+            data-ocid="shop.product.button"
+            onClick={handleAdd}
+            disabled={!inStock}
+            className="flex-1 bg-green-700 text-white font-bold text-[10px] py-1 rounded-lg flex items-center justify-center gap-0.5 disabled:opacity-50 disabled:bg-gray-400"
+          >
+            <Plus className="w-2.5 h-2.5" />
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Hero Banner ───────────────────────────────────────────────────────────────
 function HeroBanner({
   bannerText,
   deliveryTiming,
   discount,
-  minimumOrder = 0,
 }: {
   bannerText: string;
   deliveryTiming: string;
   discount: ReturnType<typeof parseDiscount>;
-  minimumOrder?: number;
 }) {
   const [slide, setSlide] = useState(0);
 
-  // Build discount label for slide 4
   let discountSlide: {
     emoji: string;
     headline: string;
@@ -262,18 +361,16 @@ function HeroBanner({
     }
   }
 
-  const minimumOrderSlide =
-    minimumOrder > 0
-      ? {
-          emoji: "🛒",
-          headline: `Minimum Order ₹${minimumOrder}`,
-          sub: "Minimum order required",
-          gradient:
-            "linear-gradient(135deg, #4a1a00 0%, #7a3000 60%, #a04000 100%)",
-        }
-      : null;
+  // Fixed minimum order slide — always present
+  const minimumOrderSlide = {
+    emoji: "🛒",
+    headline: "Minimum order up to 99₹",
+    sub: "Place orders worth ₹99 or more",
+    gradient: "linear-gradient(135deg, #4a1a00 0%, #7a3000 60%, #a04000 100%)",
+  };
 
   const slides = [
+    minimumOrderSlide,
     {
       emoji: "🥦",
       headline: bannerText || "Fresh Vegetables Daily",
@@ -284,7 +381,7 @@ function HeroBanner({
     {
       emoji: "🚚",
       headline: "Free Delivery on Every Order",
-      sub: "No minimum order required",
+      sub: "No extra charges, ever",
       gradient:
         "linear-gradient(135deg, #1a3a5c 0%, #1e5f99 60%, #2980cc 100%)",
     },
@@ -296,46 +393,61 @@ function HeroBanner({
         "linear-gradient(135deg, #0a3d1f 0%, #145c30 60%, #1e7a40 100%)",
     },
     ...(discountSlide ? [discountSlide] : []),
-    ...(minimumOrderSlide ? [minimumOrderSlide] : []),
   ];
 
   useEffect(() => {
     const timer = setInterval(() => {
       setSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    }, 3000);
     return () => clearInterval(timer);
   }, [slides.length]);
 
-  // Clamp slide index if slides length changed
   const currentSlideIdx = slide % slides.length;
   const current = slides[currentSlideIdx];
 
   return (
     <div
       data-ocid="shop.hero.panel"
-      className="mx-3 mb-3 rounded-2xl overflow-hidden shadow-lg relative"
+      className="mx-3 mb-2 rounded-2xl overflow-hidden shadow-lg relative"
       style={{ height: 91 }}
     >
-      {/* Slide content */}
       <div
-        className="absolute inset-0 flex flex-col items-start justify-center px-5 transition-all duration-500"
+        className="absolute inset-0 flex items-center transition-all duration-500"
         style={{ background: current.gradient }}
       >
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-3xl">{current.emoji}</span>
-          <div>
-            <p className="text-white font-black text-base leading-snug drop-shadow">
+        {/* Left: text content — half width */}
+        <div className="w-1/2 flex items-center gap-2 pl-3 pr-1">
+          <span className="text-2xl shrink-0">{current.emoji}</span>
+          <div className="min-w-0">
+            <p className="text-white font-black text-sm leading-snug drop-shadow line-clamp-2">
               {current.headline}
             </p>
-            <p className="text-white/80 text-[11px] font-semibold">
+            <p className="text-white/80 text-[10px] font-semibold">
               {current.sub}
             </p>
           </div>
         </div>
+        {/* Right: vegetable image — half width */}
+        <div className="w-1/2 h-full relative shrink-0 overflow-hidden">
+          <img
+            src="/assets/generated/hero-vegetables-group.dim_600x200.jpg"
+            alt="Fresh Vegetables"
+            className="w-full h-full object-cover"
+            style={{ objectPosition: "center" }}
+          />
+          {/* gradient overlay to blend with slide */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)",
+            }}
+          />
+        </div>
       </div>
 
       {/* Dot indicators */}
-      <div className="absolute bottom-2.5 right-3 flex gap-1.5">
+      <div className="absolute bottom-2 right-3 flex gap-1.5 z-10">
         {slides.map((slideItem, i) => (
           <button
             key={slideItem.headline}
@@ -374,7 +486,7 @@ function CategoryPillStrip({
   };
 
   return (
-    <div className="px-3 mb-3">
+    <div className="px-3 mb-2">
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
         {pills.map((pill) => (
           <button
@@ -432,6 +544,7 @@ interface ProductRow {
   categoryKey: string;
   products: Product[];
   isFirst?: boolean;
+  isSecond?: boolean;
 }
 
 function buildProductRows(filtered: Product[]): ProductRow[] {
@@ -505,6 +618,9 @@ function buildProductRows(filtered: Product[]): ProductRow[] {
   if (rows.length > 0) {
     rows[0] = { ...rows[0], isFirst: true };
   }
+  if (rows.length > 1) {
+    rows[1] = { ...rows[1], isSecond: true };
+  }
 
   return rows;
 }
@@ -522,7 +638,6 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
   const { data: discountRaw } = useDiscount();
   const { data: bannerEnabled } = useBannerEnabled();
   const { data: bannerText } = useBannerText();
-  const { data: minimumOrderData } = useMinimumOrder();
 
   const discount = parseDiscount(discountRaw ?? "");
 
@@ -571,7 +686,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
   const showBanner = bannerEnabled !== false;
 
   return (
-    <div className="pb-4">
+    <div className="pb-2">
       {/* Search bar */}
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 shadow-xs border border-gray-100">
@@ -602,7 +717,6 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
           bannerText={bannerText ?? "Fresh Vegetables Daily"}
           deliveryTiming={deliveryTiming ?? ""}
           discount={discount}
-          minimumOrder={minimumOrderData ?? 0}
         />
       )}
 
@@ -610,7 +724,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
       <CategoryPillStrip onPillClick={handlePillClick} />
 
       {/* Category tiles */}
-      <div className="px-3 mb-3">
+      <div className="px-3 mb-2">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {CATEGORIES.map((cat) => (
             <button
@@ -671,7 +785,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
           </p>
         </div>
       ) : (
-        <div className="px-3 flex flex-col gap-4">
+        <div className="px-3 flex flex-col gap-1.5">
           {productRows.map((row, idx) => {
             // Assign ref based on the first occurrence of each category key
             const isFirstOfKey =
@@ -684,7 +798,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
             return (
               <div key={`${row.label}-${idx}`} ref={ref}>
                 {/* Section title with See All */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1">
                   <h2 className="font-bold text-gray-800 text-sm">
                     {row.label}
                   </h2>
@@ -704,6 +818,15 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
                         key={product.id.toString()}
                         product={product}
                         tiny
+                      />
+                    ))}
+                  </div>
+                ) : row.isSecond ? (
+                  <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+                    {row.products.map((product: Product) => (
+                      <HorizontalProductCard
+                        key={product.id.toString()}
+                        product={product}
                       />
                     ))}
                   </div>

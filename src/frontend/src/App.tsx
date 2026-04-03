@@ -36,7 +36,7 @@ function AppContent() {
             <span
               className="font-black tracking-tight leading-none"
               style={{
-                fontSize: "0.95rem",
+                fontSize: "0.8rem",
                 color: "#ffffff",
                 textShadow: "0 1px 3px rgba(0,0,0,0.3)",
                 letterSpacing: "-0.3px",
@@ -55,7 +55,7 @@ function AppContent() {
             </span>
             <span
               className="text-white/70 font-semibold"
-              style={{ fontSize: "0.6rem", letterSpacing: "0.04em" }}
+              style={{ fontSize: "0.55rem", letterSpacing: "0.04em" }}
             >
               Vegetables &amp; Fruits
             </span>

@@ -31,7 +31,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
-  Clock,
   Eye,
   EyeOff,
   Loader2,
@@ -40,7 +39,6 @@ import {
   Pencil,
   Plus,
   Settings,
-  Tag,
   Trash2,
   Upload,
   Users,
@@ -57,7 +55,6 @@ import {
   useDeleteProduct,
   useDeliveryTiming,
   useDiscount,
-  useMinimumOrder,
   useOrders,
   useProducts,
   useProfiles,
@@ -65,7 +62,6 @@ import {
   useSetBannerText,
   useSetDeliveryTiming,
   useSetDiscount,
-  useSetMinimumOrder,
   useUpdateOrderStatus,
   useUpdateProduct,
 } from "../hooks/useQueries";
@@ -1154,14 +1150,11 @@ function ProfilesTab() {
 function SettingsTab() {
   const { data: bannerEnabled } = useBannerEnabled();
   const { data: bannerText } = useBannerText();
-  const { data: minimumOrderData } = useMinimumOrder();
 
   const setBannerEnabled = useSetBannerEnabled();
   const setBannerText = useSetBannerText();
-  const setMinimumOrder = useSetMinimumOrder();
 
   const [bannerHeadline, setBannerHeadline] = useState("");
-  const [minOrderAmount, setMinOrderAmount] = useState("");
 
   // Sync input when data loads
   useEffect(() => {
@@ -1169,12 +1162,6 @@ function SettingsTab() {
       setBannerHeadline(bannerText);
     }
   }, [bannerText, bannerHeadline]);
-
-  useEffect(() => {
-    if (minimumOrderData !== undefined && !minOrderAmount) {
-      setMinOrderAmount(String(minimumOrderData));
-    }
-  }, [minimumOrderData, minOrderAmount]);
 
   const handleSaveBannerText = async () => {
     if (!bannerHeadline.trim()) {
@@ -1195,20 +1182,6 @@ function SettingsTab() {
       toast.success(checked ? "Hero banner enabled" : "Hero banner hidden");
     } catch {
       toast.error("Failed to update setting");
-    }
-  };
-
-  const handleSaveMinimumOrder = async () => {
-    const amount = Number.parseInt(minOrderAmount, 10);
-    if (Number.isNaN(amount) || amount < 0) {
-      toast.error("Please enter a valid amount (0 or more)");
-      return;
-    }
-    try {
-      await setMinimumOrder.mutateAsync(amount);
-      toast.success("Minimum order updated!");
-    } catch {
-      toast.error("Failed to update minimum order");
     }
   };
 
@@ -1268,41 +1241,6 @@ function SettingsTab() {
             </>
           ) : (
             "Save Banner Text"
-          )}
-        </Button>
-      </div>
-
-      {/* Minimum Order Amount */}
-      <div className="bg-card rounded-xl p-4 shadow-xs space-y-3">
-        <h3 className="font-display font-bold text-sm text-foreground">
-          Minimum Order Amount
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          Set a minimum order amount. Set to 0 to disable.
-        </p>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">Amount (₹)</Label>
-          <Input
-            data-ocid="admin.settings.input"
-            type="number"
-            placeholder="e.g. 99"
-            value={minOrderAmount}
-            onChange={(e) => setMinOrderAmount(e.target.value)}
-            min={0}
-          />
-        </div>
-        <Button
-          data-ocid="admin.settings.save_button"
-          className="w-full font-bold"
-          onClick={handleSaveMinimumOrder}
-          disabled={setMinimumOrder.isPending}
-        >
-          {setMinimumOrder.isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
-            </>
-          ) : (
-            "Save Minimum Order"
           )}
         </Button>
       </div>
