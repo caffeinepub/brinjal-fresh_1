@@ -1,14 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
-import {
-  Bell,
-  ChevronDown,
-  Home,
-  LayoutGrid,
-  MapPin,
-  Package,
-  ShoppingCart,
-  User,
-} from "lucide-react";
+import { Home, LayoutGrid, Package, ShoppingCart, User } from "lucide-react";
 import { useState } from "react";
 import { KartProvider, useKart } from "./context/KartContext";
 import AdminPage from "./pages/AdminPage";
@@ -26,130 +17,79 @@ function AppContent() {
   const { totalItems, totalAmount } = useKart();
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-dvh flex flex-col bg-background overflow-hidden">
       {/* Header */}
       <header
-        className="sticky top-0 z-40 shadow-lg"
+        className="sticky top-0 z-40 shadow-md"
         style={{
           background:
             "linear-gradient(135deg, #0a3d1a 0%, #1a5c2a 40%, #22c55e 100%)",
         }}
       >
-        {/* Top glow bar */}
-        <div
-          className="h-0.5 w-full"
-          style={{
-            background: "linear-gradient(90deg, #4ade80, #a3e635, #4ade80)",
-          }}
-        />
-        <div className="flex items-center justify-between px-3 py-2.5 gap-2">
-          {/* Left: logo — bold and attractive */}
+        <div className="flex items-center justify-between px-3 py-1.5 gap-2">
+          {/* Left: compact brand text */}
           <button
             type="button"
             onClick={() => setActiveTab("home")}
-            className="flex items-center gap-2 shrink-0"
+            className="flex flex-col leading-tight"
           >
-            {/* Basket icon with glow ring */}
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0"
+            <span
+              className="font-black tracking-tight leading-none"
               style={{
-                background: "linear-gradient(135deg, #16a34a, #4ade80)",
-                boxShadow: "0 0 10px rgba(74,222,128,0.5)",
+                fontSize: "0.95rem",
+                color: "#ffffff",
+                textShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                letterSpacing: "-0.3px",
               }}
             >
-              <span className="text-lg leading-none">🧺</span>
-            </div>
-            {/* Brand name */}
-            <div className="flex flex-col leading-tight">
+              Brinjal
               <span
-                className="font-black tracking-tight leading-none"
+                className="font-black"
                 style={{
-                  fontSize: "1.2rem",
-                  color: "#ffffff",
-                  textShadow: "0 1px 4px rgba(0,0,0,0.4)",
-                  letterSpacing: "-0.5px",
+                  color: "#a3e635",
+                  textShadow: "0 0 6px rgba(163,230,53,0.5)",
                 }}
               >
-                Brinjal
-                <span
-                  className="font-black"
-                  style={{
-                    color: "#a3e635",
-                    textShadow: "0 0 8px rgba(163,230,53,0.6)",
-                  }}
-                >
-                  .fresh
-                </span>
+                .fresh
               </span>
-              <span
-                className="text-white/60 font-medium"
-                style={{ fontSize: "0.55rem", letterSpacing: "0.08em" }}
-              >
-                FRESH VEGETABLES & MORE
-              </span>
-            </div>
+            </span>
+            <span
+              className="text-white/70 font-semibold"
+              style={{ fontSize: "0.6rem", letterSpacing: "0.04em" }}
+            >
+              Vegetables &amp; Fruits
+            </span>
           </button>
 
-          {/* Center: location pill */}
-          <div className="flex-1 flex justify-center">
-            <div
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 cursor-pointer"
-              style={{
-                background: "rgba(255,255,255,0.18)",
-                border: "1px solid rgba(255,255,255,0.28)",
-              }}
-            >
-              <MapPin className="w-3 h-3 text-lime-300" />
-              <span className="text-white text-[11px] font-semibold">
-                Deliver to: Store
+          {/* Right: cart icon with badge */}
+          <button
+            type="button"
+            data-ocid="header.cart.button"
+            aria-label="Cart"
+            onClick={() => setActiveTab("cart")}
+            className="relative w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{
+              background: "rgba(255,255,255,0.18)",
+              border: "1px solid rgba(255,255,255,0.28)",
+            }}
+          >
+            <ShoppingCart className="w-4 h-4 text-white" />
+            {totalItems > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                {totalItems > 9 ? "9+" : totalItems}
               </span>
-              <ChevronDown className="w-3 h-3 text-white/70" />
-            </div>
-          </div>
-
-          {/* Right: bell + cart in rounded square buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{
-                background: "rgba(255,255,255,0.18)",
-                border: "1px solid rgba(255,255,255,0.28)",
-              }}
-            >
-              <Bell className="w-4 h-4 text-white" />
-              <span
-                className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-400 rounded-full"
-                style={{ boxShadow: "0 0 4px rgba(248,113,113,0.8)" }}
-              />
-            </button>
-            <button
-              type="button"
-              data-ocid="header.cart.button"
-              aria-label="Cart"
-              onClick={() => setActiveTab("cart")}
-              className="relative w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{
-                background: "rgba(255,255,255,0.18)",
-                border: "1px solid rgba(255,255,255,0.28)",
-              }}
-            >
-              <ShoppingCart className="w-4 h-4 text-white" />
-              {totalItems > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center">
-                  {totalItems > 9 ? "9+" : totalItems}
-                </span>
-              )}
-            </button>
-          </div>
+            )}
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
       <main
         className="flex-1 overflow-y-auto"
-        style={{ paddingBottom: totalItems > 0 ? "8rem" : "4.5rem" }}
+        style={{
+          paddingBottom: totalItems > 0 ? "8rem" : "5rem",
+          minHeight: 0,
+        }}
       >
         {activeTab === "home" && (
           <ShopPage onOpenAdmin={() => setShowAdmin(true)} />

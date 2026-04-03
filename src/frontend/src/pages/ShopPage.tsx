@@ -15,6 +15,7 @@ import {
   useBannerText,
   useDeliveryTiming,
   useDiscount,
+  useMinimumOrder,
   useProducts,
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
@@ -221,10 +222,12 @@ function HeroBanner({
   bannerText,
   deliveryTiming,
   discount,
+  minimumOrder = 0,
 }: {
   bannerText: string;
   deliveryTiming: string;
   discount: ReturnType<typeof parseDiscount>;
+  minimumOrder?: number;
 }) {
   const [slide, setSlide] = useState(0);
 
@@ -259,6 +262,17 @@ function HeroBanner({
     }
   }
 
+  const minimumOrderSlide =
+    minimumOrder > 0
+      ? {
+          emoji: "🛒",
+          headline: `Minimum Order ₹${minimumOrder}`,
+          sub: "Minimum order required",
+          gradient:
+            "linear-gradient(135deg, #4a1a00 0%, #7a3000 60%, #a04000 100%)",
+        }
+      : null;
+
   const slides = [
     {
       emoji: "🥦",
@@ -282,6 +296,7 @@ function HeroBanner({
         "linear-gradient(135deg, #0a3d1f 0%, #145c30 60%, #1e7a40 100%)",
     },
     ...(discountSlide ? [discountSlide] : []),
+    ...(minimumOrderSlide ? [minimumOrderSlide] : []),
   ];
 
   useEffect(() => {
@@ -299,7 +314,7 @@ function HeroBanner({
     <div
       data-ocid="shop.hero.panel"
       className="mx-3 mb-3 rounded-2xl overflow-hidden shadow-lg relative"
-      style={{ height: 130 }}
+      style={{ height: 91 }}
     >
       {/* Slide content */}
       <div
@@ -507,6 +522,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
   const { data: discountRaw } = useDiscount();
   const { data: bannerEnabled } = useBannerEnabled();
   const { data: bannerText } = useBannerText();
+  const { data: minimumOrderData } = useMinimumOrder();
 
   const discount = parseDiscount(discountRaw ?? "");
 
@@ -558,7 +574,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
     <div className="pb-4">
       {/* Search bar */}
       <div className="px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 shadow-xs border border-gray-100">
+        <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 shadow-xs border border-gray-100">
           <Search className="w-4 h-4 text-gray-400 shrink-0" />
           <input
             data-ocid="shop.search_input"
@@ -586,6 +602,7 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
           bannerText={bannerText ?? "Fresh Vegetables Daily"}
           deliveryTiming={deliveryTiming ?? ""}
           discount={discount}
+          minimumOrder={minimumOrderData ?? 0}
         />
       )}
 

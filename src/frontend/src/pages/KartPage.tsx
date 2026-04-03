@@ -8,12 +8,18 @@ import { Loader2, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useKart } from "../context/KartContext";
-import { parseDiscount, useDiscount, usePlaceOrder } from "../hooks/useQueries";
+import {
+  parseDiscount,
+  useDiscount,
+  useMinimumOrder,
+  usePlaceOrder,
+} from "../hooks/useQueries";
 
 export default function KartPage() {
   const { items, updateQuantity, removeFromKart, clearKart, totalAmount } =
     useKart();
   const { data: discountRaw } = useDiscount();
+  const { data: minimumOrder } = useMinimumOrder();
   const placeOrder = usePlaceOrder();
 
   const [name, setName] = useState(
@@ -76,7 +82,10 @@ export default function KartPage() {
         items: items.map((item) => ({
           productId: item.product.id,
           productName: item.product.name,
-          quantityLabel: item.quantityOption,
+          quantityLabel:
+            item.quantity > 1
+              ? `${item.quantity}x ${item.quantityOption}`
+              : item.quantityOption,
           unitPrice: item.itemPrice,
           itemTotal: item.itemPrice * BigInt(item.quantity),
         })),
@@ -359,12 +368,23 @@ export default function KartPage() {
           </RadioGroup>
         </div>
 
+        {minimumOrder && minimumOrder > 0 && subtotal < minimumOrder && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-amber-700">
+              Minimum order is ₹{minimumOrder}. Add ₹{minimumOrder - subtotal}{" "}
+              more to place your order.
+            </p>
+          </div>
+        )}
         <Button
           data-ocid="kart.submit_button"
           className="w-full font-bold"
           size="lg"
           onClick={handlePlaceOrder}
-          disabled={placeOrder.isPending}
+          disabled={
+            placeOrder.isPending ||
+            (!!minimumOrder && minimumOrder > 0 && subtotal < minimumOrder)
+          }
         >
           {placeOrder.isPending ? (
             <>

@@ -145,6 +145,9 @@ actor {
   stable var trustBadgesEnabled : Bool = true;
   stable var bannerCustomText : Text = "Fresh Vegetables Daily";
 
+  // Minimum order amount (0 = no minimum)
+  stable var minimumOrder : Nat = 0;
+
   let productsNew = Map.empty<Nat, Product>();
   let ordersNew = Map.empty<Nat, Order>();
   let profiles = Map.empty<Text, CustomerProfile>();
@@ -332,5 +335,14 @@ actor {
 
   public shared func setBannerText(text : Text) : async () {
     bannerCustomText := text;
+  };
+
+  // Minimum order amount
+  public query func getMinimumOrder() : async Nat {
+    minimumOrder;
+  };
+
+  public shared func setMinimumOrder(amount : Nat) : async () {
+    minimumOrder := amount;
   };
 };

@@ -137,6 +137,25 @@ export function useBannerText() {
   });
 }
 
+export function useMinimumOrder() {
+  const { actor, isFetching } = useActor();
+  return useQuery<number>({
+    queryKey: ["minimumOrder"],
+    queryFn: async () => {
+      if (!actor) return 0;
+      try {
+        const val = await (actor as any).getMinimumOrder();
+        return Number(val);
+      } catch {
+        return 0;
+      }
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
 export function useSetBannerEnabled() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -175,6 +194,20 @@ export function useSetBannerText() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bannerText"] });
+    },
+  });
+}
+
+export function useSetMinimumOrder() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (amount: number) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).setMinimumOrder(BigInt(amount));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["minimumOrder"] });
     },
   });
 }
