@@ -1,5 +1,12 @@
 import { Toaster } from "@/components/ui/sonner";
-import { Home, LayoutGrid, Package, ShoppingCart, User } from "lucide-react";
+import {
+  Home,
+  LayoutGrid,
+  type LucideIcon,
+  Package,
+  ShoppingCart,
+  User,
+} from "lucide-react";
 import { useState } from "react";
 import { KartProvider, useKart } from "./context/KartContext";
 import AdminPage from "./pages/AdminPage";
@@ -9,59 +16,61 @@ import OrderPage from "./pages/OrderPage";
 import ProfilePage from "./pages/ProfilePage";
 import ShopPage from "./pages/ShopPage";
 
-export type Tab = "home" | "categories" | "cart" | "orders" | "profile";
+export type Tab = "home" | "categories" | "cart" | "orders" | "account";
+
+interface NavItem {
+  key: Tab;
+  label: string;
+  icon: LucideIcon;
+  badge?: number;
+}
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [showAdmin, setShowAdmin] = useState(false);
   const { totalItems, totalAmount } = useKart();
 
+  const navItems: NavItem[] = [
+    { key: "home", label: "Home", icon: Home },
+    { key: "categories", label: "Categories", icon: LayoutGrid },
+    { key: "cart", label: "Cart", icon: ShoppingCart, badge: totalItems },
+    { key: "orders", label: "Order", icon: Package },
+    { key: "account", label: "Account", icon: User },
+  ];
+
   return (
-    <div className="min-h-dvh flex flex-col bg-background overflow-hidden">
-      {/* Header */}
+    <div className="min-h-dvh flex flex-col bg-background">
+      {/* Compact Header */}
       <header
-        className="sticky top-0 z-40 shadow-md"
+        className="sticky top-0 z-40"
         style={{
           background:
-            "linear-gradient(135deg, #0a3d1a 0%, #1a5c2a 40%, #22c55e 100%)",
+            "linear-gradient(135deg, #14532d 0%, #166534 40%, #16a34a 100%)",
+          minHeight: 50,
+          maxHeight: 56,
         }}
       >
-        <div className="flex items-center justify-between px-3 py-1.5 gap-2">
-          {/* Left: compact brand text */}
+        <div className="flex items-center justify-between px-3 h-[50px]">
           <button
             type="button"
             onClick={() => setActiveTab("home")}
             className="flex flex-col leading-tight"
           >
             <span
-              className="font-black tracking-tight leading-none"
-              style={{
-                fontSize: "0.8rem",
-                color: "#ffffff",
-                textShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                letterSpacing: "-0.3px",
-              }}
+              className="font-display font-black leading-none tracking-tight"
+              style={{ fontSize: "0.78rem", color: "#ffffff" }}
             >
               Brinjal
-              <span
-                className="font-black"
-                style={{
-                  color: "#a3e635",
-                  textShadow: "0 0 6px rgba(163,230,53,0.5)",
-                }}
-              >
-                .fresh
-              </span>
+              <span style={{ color: "#bbf7d0" }}>.fresh</span>
             </span>
             <span
-              className="text-white/70 font-semibold"
-              style={{ fontSize: "0.55rem", letterSpacing: "0.04em" }}
+              className="font-body font-semibold text-white/65"
+              style={{ fontSize: "0.5rem", letterSpacing: "0.05em" }}
             >
               Vegetables &amp; Fruits
             </span>
           </button>
 
-          {/* Right: cart icon with badge */}
           <button
             type="button"
             data-ocid="header.cart.button"
@@ -69,8 +78,8 @@ function AppContent() {
             onClick={() => setActiveTab("cart")}
             className="relative w-8 h-8 rounded-xl flex items-center justify-center"
             style={{
-              background: "rgba(255,255,255,0.18)",
-              border: "1px solid rgba(255,255,255,0.28)",
+              background: "rgba(255,255,255,0.15)",
+              border: "1px solid rgba(255,255,255,0.25)",
             }}
           >
             <ShoppingCart className="w-4 h-4 text-white" />
@@ -83,7 +92,7 @@ function AppContent() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main content */}
       <main
         className="flex-1 overflow-y-auto"
         style={{
@@ -97,17 +106,10 @@ function AppContent() {
         {activeTab === "categories" && <CategoriesPage />}
         {activeTab === "cart" && <KartPage />}
         {activeTab === "orders" && <OrderPage />}
-        {activeTab === "profile" && <ProfilePage />}
+        {activeTab === "account" && <ProfilePage />}
       </main>
 
-      {/* Admin Overlay */}
-      {showAdmin && (
-        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
-          <AdminPage onClose={() => setShowAdmin(false)} />
-        </div>
-      )}
-
-      {/* Floating Cart Bar */}
+      {/* Floating cart bar */}
       {totalItems > 0 && activeTab !== "cart" && !showAdmin && (
         <div
           className="fixed left-0 right-0 z-40 px-3"
@@ -118,13 +120,13 @@ function AppContent() {
             data-ocid="cart.floating.button"
             onClick={() => setActiveTab("cart")}
             className="w-full flex items-center justify-between rounded-xl px-4 py-3 shadow-card-lg"
-            style={{ backgroundColor: "#1a5c2a" }}
+            style={{ background: "#14532d" }}
           >
             <div className="flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-white" />
+              <ShoppingCart className="w-4 h-4 text-white" />
               <span className="text-white font-semibold text-sm">
-                {totalItems} Item{totalItems !== 1 ? "s" : ""} · ₹
-                {Number(totalAmount)}
+                {totalItems} item{totalItems !== 1 ? "s" : ""} &middot; ₹
+                {Number(totalAmount) / 100}
               </span>
             </div>
             <span className="bg-orange-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg">
@@ -134,99 +136,46 @@ function AppContent() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
+      {/* Admin overlay */}
+      {showAdmin && (
+        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+          <AdminPage onClose={() => setShowAdmin(false)} />
+        </div>
+      )}
+
+      {/* Bottom Navigation — FIXED */}
       {!showAdmin && (
         <nav
-          className="fixed bottom-0 left-0 right-0 z-50 border-t border-orange-600/30"
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-orange-600/20"
           style={{ backgroundColor: "#f97316" }}
         >
-          <div className="flex items-stretch">
-            <button
-              type="button"
-              data-ocid="nav.home.tab"
-              onClick={() => setActiveTab("home")}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
-                activeTab === "home"
-                  ? "text-white bg-white/20"
-                  : "text-white/80 hover:text-white"
-              }`}
-            >
-              <Home className="w-5 h-5" />
-              <span className="text-[10px] font-display font-semibold">
-                Home
-              </span>
-            </button>
-
-            <button
-              type="button"
-              data-ocid="nav.categories.tab"
-              onClick={() => setActiveTab("categories")}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
-                activeTab === "categories"
-                  ? "text-white bg-white/20"
-                  : "text-white/80 hover:text-white"
-              }`}
-            >
-              <LayoutGrid className="w-5 h-5" />
-              <span className="text-[10px] font-display font-semibold">
-                Categories
-              </span>
-            </button>
-
-            <button
-              type="button"
-              data-ocid="nav.cart.tab"
-              onClick={() => setActiveTab("cart")}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 relative transition-colors ${
-                activeTab === "cart"
-                  ? "text-white bg-white/20"
-                  : "text-white/80 hover:text-white"
-              }`}
-            >
-              <div className="relative">
-                <ShoppingCart className="w-5 h-5" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-white text-orange-500 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                    {totalItems > 9 ? "9+" : totalItems}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] font-display font-semibold">
-                Cart
-              </span>
-            </button>
-
-            <button
-              type="button"
-              data-ocid="nav.orders.tab"
-              onClick={() => setActiveTab("orders")}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
-                activeTab === "orders"
-                  ? "text-white bg-white/20"
-                  : "text-white/80 hover:text-white"
-              }`}
-            >
-              <Package className="w-5 h-5" />
-              <span className="text-[10px] font-display font-semibold">
-                Orders
-              </span>
-            </button>
-
-            <button
-              type="button"
-              data-ocid="nav.profile.tab"
-              onClick={() => setActiveTab("profile")}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
-                activeTab === "profile"
-                  ? "text-white bg-white/20"
-                  : "text-white/80 hover:text-white"
-              }`}
-            >
-              <User className="w-5 h-5" />
-              <span className="text-[10px] font-display font-semibold">
-                Account
-              </span>
-            </button>
+          <div
+            className="flex items-stretch"
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+          >
+            {navItems.map(({ key, label, icon: Icon, badge }) => (
+              <button
+                key={key}
+                type="button"
+                data-ocid={`nav.${key}.tab`}
+                onClick={() => setActiveTab(key)}
+                className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-1 transition-colors ${
+                  activeTab === key ? "text-white bg-white/20" : "text-white/80"
+                }`}
+              >
+                <div className="relative">
+                  <Icon className="w-5 h-5" />
+                  {badge != null && badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2 bg-white text-orange-500 text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] font-display font-bold">
+                  {label}
+                </span>
+              </button>
+            ))}
           </div>
         </nav>
       )}

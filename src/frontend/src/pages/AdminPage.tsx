@@ -1,56 +1,10 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Loader2,
-  Lock,
-  Package,
-  Pencil,
-  Plus,
-  Settings,
-  Trash2,
-  Upload,
-  Users,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
-import type { CustomerProfile, Order, Product } from "../backend";
+import type { Order, Product } from "../backend";
 import {
   parseDiscount,
   useAddProduct,
-  useBannerEnabled,
-  useBannerText,
   useDeleteOrder,
   useDeleteProduct,
   useDeliveryTiming,
@@ -58,8 +12,6 @@ import {
   useOrders,
   useProducts,
   useProfiles,
-  useSetBannerEnabled,
-  useSetBannerText,
   useSetDeliveryTiming,
   useSetDiscount,
   useUpdateOrderStatus,
@@ -67,180 +19,100 @@ import {
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
 
-const ADMIN_PASSWORD = "adita96319";
-
-type UnitType = "kg" | "piece" | "bundle" | "packet";
-
-const UNIT_LABELS: Record<UnitType, string> = {
-  kg: "Weight (kg)",
-  piece: "By Piece",
-  bundle: "By Bundle",
-  packet: "By Packet",
-};
-
-const PRICE_LABELS: Record<UnitType, string> = {
-  kg: "Price per kg (₹)",
-  piece: "Price per piece (₹)",
-  bundle: "Price per bundle (₹)",
-  packet: "Price per packet (₹)",
-};
-
-const PRODUCT_CATEGORIES = [
+const CATEGORIES = [
   "Vegetables",
   "Fruits",
-  "Leafy Vegetables",
-  "Root Vegetables",
-  "Combo Pack",
+  "LeafyVegetables",
+  "RootVegetables",
+  "ComboPack",
 ];
+const UNIT_TYPES = ["kg", "piece", "bundle", "packet"];
 
-// ─── Password Gate ────────────────────────────────────────────────────────────
-function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
-  const [pwd, setPwd] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = () => {
-    if (pwd !== ADMIN_PASSWORD) {
-      setError("Incorrect password.");
-      return;
-    }
-    onSuccess();
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 gap-6">
-      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-        <Lock className="w-8 h-8 text-primary" />
-      </div>
-      <div className="text-center">
-        <h2 className="font-display text-xl font-bold text-foreground">
-          Admin Panel
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Enter password to access.
-        </p>
-      </div>
-      <div className="w-full max-w-xs space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="admin-pwd" className="text-xs font-semibold">
-            Password
-          </Label>
-          <div className="relative">
-            <Input
-              id="admin-pwd"
-              data-ocid="admin.input"
-              type={showPwd ? "text" : "password"}
-              placeholder="Enter admin password"
-              value={pwd}
-              onChange={(e) => {
-                setPwd(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPwd((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            >
-              {showPwd ? (
-                <EyeOff className="w-4 h-4" />
-              ) : (
-                <Eye className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-          {error && (
-            <p
-              data-ocid="admin.error_state"
-              className="text-xs text-destructive"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-        <Button
-          data-ocid="admin.submit_button"
-          className="w-full font-bold"
-          onClick={handleSubmit}
-        >
-          Login
-        </Button>
-      </div>
-    </div>
-  );
+function formatDate(nanos: bigint): string {
+  const ms = Number(nanos) / 1_000_000;
+  return new Date(ms).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-// ─── Product Image (uses storageClient) ────────────────────────────────────────
-function ProductThumb({ imageId }: { imageId: string }) {
-  const storageClient = useStorageClient();
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!imageId || !storageClient) return;
-    storageClient
-      .getDirectURL(imageId)
-      .then(setUrl)
-      .catch(() => setUrl(null));
-  }, [imageId, storageClient]);
-
-  if (!imageId || !url) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-xl">
-        🥦
-      </div>
-    );
+function groupOrders(orders: Order[]) {
+  const now = new Date();
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const yesterday = today - 86400000;
+  const groups: { label: string; orders: Order[] }[] = [
+    { label: "Today", orders: [] },
+    { label: "Yesterday", orders: [] },
+    { label: "Earlier", orders: [] },
+  ];
+  for (const o of orders) {
+    const ts = Number(o.createdAt) / 1_000_000;
+    if (ts >= today) groups[0].orders.push(o);
+    else if (ts >= yesterday) groups[1].orders.push(o);
+    else groups[2].orders.push(o);
   }
-  return <img src={url} alt="product" className="w-full h-full object-cover" />;
+  return groups.filter((g) => g.orders.length > 0);
 }
 
-// ─── Product Form ─────────────────────────────────────────────────────────────
+// ─── Product Form ───────────────────────────────────────────────────────────────────────
 interface ProductFormData {
   name: string;
   description: string;
-  unitType: UnitType;
-  productCategory: string;
   price: string;
   stock: string;
+  unitType: string;
+  productCategory: string;
   imageId: string;
 }
 
-const defaultForm = (): ProductFormData => ({
+const EMPTY_FORM: ProductFormData = {
   name: "",
   description: "",
-  unitType: "kg",
-  productCategory: "Vegetables",
   price: "",
   stock: "",
+  unitType: "kg",
+  productCategory: "Vegetables",
   imageId: "",
-});
+};
+
+const ic =
+  "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-green-500";
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-bold text-gray-600 mb-1">{children}</p>;
+}
 
 function ProductForm({
   initial,
   onSave,
   onCancel,
-  isSaving,
+  isPending,
 }: {
-  initial?: ProductFormData;
+  initial: ProductFormData;
   onSave: (data: ProductFormData) => void;
   onCancel: () => void;
-  isSaving: boolean;
+  isPending: boolean;
 }) {
-  const [form, setForm] = useState<ProductFormData>(initial ?? defaultForm());
-  const storageClient = useStorageClient();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [form, setForm] = useState(initial);
   const [uploading, setUploading] = useState(false);
+  const storageClient = useStorageClient();
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !storageClient) return;
     setUploading(true);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8 = new Uint8Array(arrayBuffer);
-      const { hash } = await storageClient.putFile(uint8);
-      setForm((prev) => ({ ...prev, imageId: hash }));
+      const buffer = await file.arrayBuffer();
+      const { hash } = await storageClient.putFile(new Uint8Array(buffer));
+      const imageId = `!caf!${hash}`;
+      setForm((f) => ({ ...f, imageId }));
       toast.success("Image uploaded!");
     } catch {
       toast.error("Image upload failed");
@@ -249,350 +121,327 @@ function ProductForm({
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.price) {
+      toast.error("Name and price are required");
+      return;
+    }
+    onSave(form);
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Product Name</Label>
-        <Input
-          data-ocid="admin.products.input"
-          placeholder="e.g. Fresh Tomatoes"
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div>
+        <label htmlFor="pf-name">
+          <FieldLabel>Product Name *</FieldLabel>
+        </label>
+        <input
+          id="pf-name"
+          data-ocid="admin.input"
+          className={ic}
           value={form.name}
-          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder="e.g. Fresh Tomato"
         />
       </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">
-          Short Description{" "}
-          <span className="font-normal text-muted-foreground">(optional)</span>
-        </Label>
-        <Input
-          data-ocid="admin.products.input"
-          placeholder="e.g. Fresh red tomato"
+      <div>
+        <label htmlFor="pf-desc">
+          <FieldLabel>Description</FieldLabel>
+        </label>
+        <textarea
+          id="pf-desc"
+          data-ocid="admin.textarea"
+          className={`${ic} resize-none`}
+          rows={2}
           value={form.description}
           onChange={(e) =>
-            setForm((p) => ({ ...p, description: e.target.value }))
+            setForm((f) => ({ ...f, description: e.target.value }))
           }
-          maxLength={60}
+          placeholder="Short product description"
         />
       </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Category</Label>
-        <Select
-          value={form.productCategory}
-          onValueChange={(v) => setForm((p) => ({ ...p, productCategory: v }))}
-        >
-          <SelectTrigger data-ocid="admin.products.select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRODUCT_CATEGORIES.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Unit Type</Label>
-        <Select
-          value={form.unitType}
-          onValueChange={(v) =>
-            setForm((p) => ({ ...p, unitType: v as UnitType }))
-          }
-        >
-          <SelectTrigger data-ocid="admin.products.select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.entries(UNIT_LABELS) as [UnitType, string][]).map(
-              ([val, label]) => (
-                <SelectItem key={val} value={val}>
-                  {label}
-                </SelectItem>
-              ),
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">
-          {PRICE_LABELS[form.unitType]}
-        </Label>
-        <Input
-          data-ocid="admin.products.input"
-          type="number"
-          placeholder="0"
-          value={form.price}
-          onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Stock</Label>
-        <Input
-          data-ocid="admin.products.input"
-          type="number"
-          placeholder="0"
-          value={form.stock}
-          onChange={(e) => setForm((p) => ({ ...p, stock: e.target.value }))}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Product Image</Label>
+      <div>
+        <label htmlFor="pf-price">
+          <FieldLabel>Price per unit (₹) *</FieldLabel>
+        </label>
         <input
-          ref={fileRef}
+          id="pf-price"
+          data-ocid="admin.input"
+          className={ic}
+          type="number"
+          min="0"
+          step="0.01"
+          value={form.price}
+          onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+          placeholder="e.g. 28"
+        />
+      </div>
+      <div>
+        <label htmlFor="pf-stock">
+          <FieldLabel>Stock</FieldLabel>
+        </label>
+        <input
+          id="pf-stock"
+          data-ocid="admin.input"
+          className={ic}
+          type="number"
+          min="0"
+          value={form.stock}
+          onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+          placeholder="Available stock"
+        />
+      </div>
+      <div>
+        <label htmlFor="pf-unit">
+          <FieldLabel>Unit Type</FieldLabel>
+        </label>
+        <select
+          id="pf-unit"
+          data-ocid="admin.select"
+          className={ic}
+          value={form.unitType}
+          onChange={(e) => setForm((f) => ({ ...f, unitType: e.target.value }))}
+        >
+          {UNIT_TYPES.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="pf-cat">
+          <FieldLabel>Category</FieldLabel>
+        </label>
+        <select
+          id="pf-cat"
+          data-ocid="admin.select"
+          className={ic}
+          value={form.productCategory}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, productCategory: e.target.value }))
+          }
+        >
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <FieldLabel>Product Image</FieldLabel>
+        <input
+          data-ocid="admin.upload_button"
           type="file"
           accept="image/*"
-          className="hidden"
           onChange={handleImageUpload}
+          className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-green-700 file:text-white"
         />
-        <Button
-          type="button"
-          data-ocid="admin.products.upload_button"
-          variant="outline"
-          className="w-full"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading || !storageClient}
-        >
-          {uploading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4 mr-2" />{" "}
-              {form.imageId ? "Change Photo" : "Upload Photo"}
-            </>
-          )}
-        </Button>
-        {form.imageId && (
-          <p className="text-xs text-primary font-medium">✓ Image uploaded</p>
+        {uploading && (
+          <p className="text-xs text-green-600 font-semibold mt-1">
+            Uploading image...
+          </p>
+        )}
+        {form.imageId && !uploading && (
+          <p className="text-xs text-green-600 font-semibold mt-1">
+            ✔ Image uploaded
+          </p>
         )}
       </div>
-
-      <DialogFooter className="pt-2 gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          data-ocid="admin.products.cancel_button"
-          onClick={onCancel}
+      <div className="flex gap-2 mt-1">
+        <button
+          type="submit"
+          data-ocid="admin.save_button"
+          disabled={isPending || uploading}
+          className="flex-1 bg-green-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 text-sm"
         >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          data-ocid="admin.products.save_button"
-          onClick={() => onSave(form)}
-          disabled={isSaving || uploading}
-        >
-          {isSaving ? (
+          {isPending ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
             </>
           ) : (
             "Save Product"
           )}
-        </Button>
-      </DialogFooter>
-    </div>
+        </button>
+        <button
+          type="button"
+          data-ocid="admin.cancel_button"
+          onClick={onCancel}
+          className="flex-1 border border-gray-200 text-gray-600 font-bold py-3 rounded-xl text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
-// ─── Products Tab ─────────────────────────────────────────────────────────────
+// ─── Admin Tabs ───────────────────────────────────────────────────────────────────────────
+type AdminTab =
+  | "products"
+  | "orders"
+  | "delivery"
+  | "discount"
+  | "profiles"
+  | "settings";
+
 function ProductsTab() {
   const { data: products, isLoading } = useProducts();
-  const addProduct = useAddProduct();
-  const updateProduct = useUpdateProduct();
-  const deleteProduct = useDeleteProduct();
-
-  const [showAdd, setShowAdd] = useState(false);
+  const addProductMutation = useAddProduct();
+  const updateProductMutation = useUpdateProduct();
+  const deleteProductMutation = useDeleteProduct();
+  const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
 
-  const handleAdd = async (data: ProductFormData) => {
-    if (!data.name || !data.price || !data.stock) {
-      toast.error("Please fill all fields");
-      return;
-    }
+  const handleSave = async (data: ProductFormData) => {
+    const priceInPaise = BigInt(
+      Math.round(Number.parseFloat(data.price) * 100),
+    );
+    const stock = BigInt(Number.parseInt(data.stock || "0"));
     try {
-      await addProduct.mutateAsync({
-        name: data.name.trim(),
-        description: data.description.trim(),
-        price: BigInt(Math.round(Number(data.price))),
-        stock: BigInt(Math.round(Number(data.stock))),
-        imageId: data.imageId,
-        unitType: data.unitType,
-        productCategory: data.productCategory,
-      });
-      setShowAdd(false);
-      toast.success("Product added!");
-    } catch {
-      toast.error("Failed to add product");
+      if (editProduct) {
+        await updateProductMutation.mutateAsync({
+          id: editProduct.id,
+          name: data.name.trim(),
+          description: data.description.trim(),
+          price: priceInPaise,
+          stock,
+          imageId: data.imageId || editProduct.imageId,
+          unitType: data.unitType,
+          productCategory: data.productCategory,
+        });
+        toast.success("Product updated!");
+      } else {
+        await addProductMutation.mutateAsync({
+          name: data.name.trim(),
+          description: data.description.trim(),
+          price: priceInPaise,
+          stock,
+          imageId: data.imageId,
+          unitType: data.unitType,
+          productCategory: data.productCategory,
+        });
+        toast.success("Product added!");
+      }
+      setShowForm(false);
+      setEditProduct(null);
+    } catch (err) {
+      toast.error(`Failed: ${err}`);
     }
   };
 
-  const handleEdit = async (data: ProductFormData) => {
-    if (!editProduct) return;
+  const handleDelete = async (id: bigint) => {
+    if (!confirm("Delete this product?")) return;
     try {
-      await updateProduct.mutateAsync({
-        id: editProduct.id,
-        name: data.name.trim(),
-        description: data.description.trim(),
-        price: BigInt(Math.round(Number(data.price))),
-        stock: BigInt(Math.round(Number(data.stock))),
-        imageId: data.imageId,
-        unitType: data.unitType,
-        productCategory: data.productCategory,
-      });
-      setEditProduct(null);
-      toast.success("Product updated!");
+      await deleteProductMutation.mutateAsync(id);
+      toast.success("Product deleted");
     } catch {
-      toast.error("Failed to update product");
+      toast.error("Failed to delete");
     }
   };
 
   return (
-    <div className="space-y-3">
-      <Button
-        data-ocid="admin.products.open_modal_button"
-        className="w-full font-bold"
-        onClick={() => setShowAdd(true)}
-      >
-        <Plus className="w-4 h-4 mr-2" /> Add New Product
-      </Button>
-
-      {/* Add Dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="max-w-sm mx-4">
-          <DialogHeader>
-            <DialogTitle className="font-display">Add New Product</DialogTitle>
-          </DialogHeader>
+    <div>
+      {!showForm && (
+        <button
+          type="button"
+          data-ocid="admin.primary_button"
+          onClick={() => {
+            setShowForm(true);
+            setEditProduct(null);
+          }}
+          className="w-full flex items-center justify-center gap-2 bg-green-700 text-white font-bold py-3 rounded-xl text-sm mb-4"
+        >
+          <Plus className="w-4 h-4" /> Add Product
+        </button>
+      )}
+      {showForm && (
+        <div className="bg-gray-50 rounded-2xl p-4 mb-4">
+          <h3 className="font-display font-bold text-gray-800 text-sm mb-3">
+            {editProduct ? "Edit Product" : "Add New Product"}
+          </h3>
           <ProductForm
-            onSave={handleAdd}
-            onCancel={() => setShowAdd(false)}
-            isSaving={addProduct.isPending}
+            initial={
+              editProduct
+                ? {
+                    name: editProduct.name,
+                    description: editProduct.description,
+                    price: String(Number(editProduct.price) / 100),
+                    stock: String(Number(editProduct.stock)),
+                    unitType: editProduct.unitType,
+                    productCategory: editProduct.productCategory,
+                    imageId: editProduct.imageId,
+                  }
+                : EMPTY_FORM
+            }
+            onSave={handleSave}
+            onCancel={() => {
+              setShowForm(false);
+              setEditProduct(null);
+            }}
+            isPending={
+              addProductMutation.isPending || updateProductMutation.isPending
+            }
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog
-        open={!!editProduct}
-        onOpenChange={(open) => !open && setEditProduct(null)}
-      >
-        <DialogContent className="max-w-sm mx-4">
-          <DialogHeader>
-            <DialogTitle className="font-display">Edit Product</DialogTitle>
-          </DialogHeader>
-          {editProduct && (
-            <ProductForm
-              initial={{
-                name: editProduct.name || "",
-                description: editProduct.description || "",
-                unitType: (editProduct.unitType as UnitType) || "kg",
-                productCategory: editProduct.productCategory || "Vegetables",
-                price: String(Number(editProduct.price)),
-                stock: String(Number(editProduct.stock)),
-                imageId: editProduct.imageId,
-              }}
-              onSave={handleEdit}
-              onCancel={() => setEditProduct(null)}
-              isSaving={updateProduct.isPending}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
+        </div>
+      )}
       {isLoading ? (
-        <div data-ocid="admin.products.loading_state" className="space-y-2">
-          {["p1", "p2", "p3"].map((k) => (
-            <Skeleton key={k} className="h-16 w-full rounded-xl" />
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3].map((k) => (
+            <div
+              key={k}
+              className="h-16 bg-gray-100 rounded-xl animate-pulse"
+            />
           ))}
         </div>
-      ) : !products?.length ? (
-        <div
-          data-ocid="admin.products.empty_state"
-          className="text-center py-12"
+      ) : (products ?? []).length === 0 ? (
+        <p
+          data-ocid="admin.empty_state"
+          className="text-center text-gray-400 text-sm py-8"
         >
-          <Package className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="text-sm text-muted-foreground">
-            No products yet. Add your first product!
-          </p>
-        </div>
+          No products yet. Add your first product!
+        </p>
       ) : (
-        <div className="space-y-2">
-          {products.map((product: Product, idx: number) => (
+        <div className="flex flex-col gap-2">
+          {(products ?? []).map((p: Product, idx: number) => (
             <div
-              key={product.id.toString()}
-              data-ocid={`admin.products.item.${idx + 1}`}
-              className="bg-card rounded-xl p-3 flex items-center gap-3 shadow-xs"
+              key={p.id.toString()}
+              data-ocid={`admin.item.${idx + 1}`}
+              className="bg-white rounded-xl border border-gray-100 shadow-xs p-3 flex items-center gap-3"
             >
-              <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0">
-                <ProductThumb imageId={product.imageId} />
-              </div>
               <div className="flex-1 min-w-0">
-                <p className="font-display font-bold text-sm truncate">
-                  {product.name}
+                <p className="font-bold text-gray-800 text-sm line-clamp-1">
+                  {p.name}
                 </p>
-                {product.description && (
-                  <p className="text-xs text-muted-foreground italic truncate">
-                    {product.description}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  ₹{Number(product.price)}/{product.unitType || "kg"} •{" "}
-                  {product.productCategory} • Stock: {Number(product.stock)}
+                <p className="text-gray-500 text-xs">
+                  {p.productCategory} · {p.unitType} · ₹{Number(p.price) / 100}{" "}
+                  · Stock: {Number(p.stock)}
                 </p>
               </div>
-              <div className="flex gap-1.5">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  data-ocid={`admin.products.edit_button.${idx + 1}`}
-                  className="w-8 h-8"
-                  onClick={() => setEditProduct(product)}
+              <div className="flex gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  data-ocid={`admin.edit_button.${idx + 1}`}
+                  onClick={() => {
+                    setEditProduct(p);
+                    setShowForm(true);
+                  }}
+                  className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      data-ocid={`admin.products.delete_button.${idx + 1}`}
-                      className="w-8 h-8"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete "{product.name}"?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel data-ocid="admin.products.cancel_button">
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        data-ocid="admin.products.confirm_button"
-                        onClick={() => {
-                          deleteProduct.mutate(product.id);
-                          toast.success("Product deleted");
-                        }}
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                </button>
+                <button
+                  type="button"
+                  data-ocid={`admin.delete_button.${idx + 1}`}
+                  onClick={() => handleDelete(p.id)}
+                  disabled={deleteProductMutation.isPending}
+                  className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                </button>
               </div>
             </div>
           ))}
@@ -602,543 +451,397 @@ function ProductsTab() {
   );
 }
 
-// ─── Orders Tab ───────────────────────────────────────────────────────────────
-function formatOrderDate(ts: bigint): string {
-  const ms = Number(ts) / 1_000_000;
-  const date = new Date(ms);
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function isSameDay(ts: bigint, ref: Date): boolean {
-  const ms = Number(ts) / 1_000_000;
-  const d = new Date(ms);
-  return (
-    d.getFullYear() === ref.getFullYear() &&
-    d.getMonth() === ref.getMonth() &&
-    d.getDate() === ref.getDate()
-  );
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  delivered: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
-};
-
-function OrderCard({ order, idx }: { order: Order; idx: number }) {
-  const updateStatus = useUpdateOrderStatus();
-  const deleteOrder = useDeleteOrder();
-
-  const statusColor =
-    STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-800";
-
-  return (
-    <div
-      data-ocid={`admin.orders.item.${idx + 1}`}
-      className="bg-card rounded-xl p-4 shadow-xs space-y-3"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-display font-bold text-sm">{order.customerName}</p>
-          <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
-        </div>
-        <span
-          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}
-        >
-          {order.status}
-        </span>
-      </div>
-
-      <div className="text-xs text-muted-foreground">
-        {order.customerAddress}
-      </div>
-
-      {/* Order items */}
-      <div className="space-y-1">
-        {order.items.map((item) => (
-          <div
-            key={`${String(item.productId)}-${item.productName}`}
-            className="text-xs flex items-center justify-between"
-          >
-            <span className="font-medium">{item.productName}</span>
-            {item.quantityLabel && (
-              <span className="font-bold text-foreground ml-2">
-                {item.quantityLabel}
-              </span>
-            )}
-            <span className="ml-auto pl-2">₹{Number(item.itemTotal)}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
-          {Number(order.discountAmount) > 0 && (
-            <p className="text-xs text-green-600">
-              Discount: -₹{Number(order.discountAmount)}
-            </p>
-          )}
-          <p className="font-bold text-sm">
-            Total: ₹{Number(order.totalAmount)}
-          </p>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {formatOrderDate(order.createdAt)}
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Select
-          value={order.status}
-          onValueChange={(s) =>
-            updateStatus.mutate({ orderId: order.id, status: s })
-          }
-        >
-          <SelectTrigger
-            data-ocid={`admin.orders.select.${idx + 1}`}
-            className="h-8 text-xs flex-1"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {["pending", "processing", "delivered", "cancelled"].map((s) => (
-              <SelectItem key={s} value={s} className="text-xs capitalize">
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {order.status === "delivered" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="destructive"
-                data-ocid={`admin.orders.delete_button.${idx + 1}`}
-                className="h-8"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Delete this delivered order from {order.customerName}?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-ocid="admin.orders.cancel_button">
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  data-ocid="admin.orders.confirm_button"
-                  onClick={() => deleteOrder.mutate(order.id)}
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function OrdersTab() {
-  const { data: orders, isLoading } = useOrders();
+  const { data: orders, isLoading, refetch } = useOrders();
+  const updateStatusMutation = useUpdateOrderStatus();
+  const deleteOrderMutation = useDeleteOrder();
 
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  const todayOrders = (orders ?? []).filter((o: Order) =>
-    isSameDay(o.createdAt, now),
-  );
-  const yesterdayOrders = (orders ?? []).filter((o: Order) =>
-    isSameDay(o.createdAt, yesterday),
-  );
-  const pastOrders = (orders ?? []).filter(
-    (o: Order) =>
-      !isSameDay(o.createdAt, now) && !isSameDay(o.createdAt, yesterday),
-  );
-
-  const renderGroup = (title: string, group: Order[], startIdx: number) => {
-    if (group.length === 0) return null;
-    return (
-      <div className="space-y-2">
-        <h3 className="font-display font-bold text-sm text-foreground/70 uppercase tracking-wide">
-          {title}
-        </h3>
-        {group.map((order: Order, i: number) => (
-          <OrderCard
-            key={order.id.toString()}
-            order={order}
-            idx={startIdx + i}
-          />
-        ))}
-      </div>
-    );
+  const handleStatusChange = async (orderId: bigint, status: string) => {
+    try {
+      await updateStatusMutation.mutateAsync({ orderId, status });
+      toast.success(`Status updated to ${status}`);
+    } catch {
+      toast.error("Failed to update status");
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div data-ocid="admin.orders.loading_state" className="space-y-2">
-        {["o1", "o2", "o3"].map((k) => (
-          <Skeleton key={k} className="h-32 w-full rounded-xl" />
-        ))}
-      </div>
-    );
-  }
+  const handleDelete = async (id: bigint) => {
+    if (!confirm("Delete this order?")) return;
+    try {
+      await deleteOrderMutation.mutateAsync(id);
+      toast.success("Order deleted");
+    } catch {
+      toast.error("Failed to delete order");
+    }
+  };
 
-  if (!orders?.length) {
+  if (isLoading)
     return (
-      <div data-ocid="admin.orders.empty_state" className="text-center py-12">
-        <p className="text-sm text-muted-foreground">No orders yet.</p>
+      <div className="py-8 text-center text-gray-400 text-sm">
+        Loading orders...
       </div>
     );
-  }
+
+  const grouped = groupOrders(orders ?? []);
 
   return (
-    <div className="space-y-4">
-      {renderGroup("Today", todayOrders, 0)}
-      {renderGroup("Yesterday", yesterdayOrders, todayOrders.length)}
-      {renderGroup(
-        "Past",
-        pastOrders,
-        todayOrders.length + yesterdayOrders.length,
+    <div>
+      <div className="flex justify-end mb-3">
+        <button
+          type="button"
+          data-ocid="admin.secondary_button"
+          onClick={() => refetch()}
+          className="flex items-center gap-1.5 text-green-700 text-xs font-bold"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </button>
+      </div>
+      {grouped.length === 0 ? (
+        <p
+          data-ocid="admin.empty_state"
+          className="text-center text-gray-400 text-sm py-8"
+        >
+          No orders yet
+        </p>
+      ) : (
+        grouped.map((group) => (
+          <div key={group.label} className="mb-4">
+            <h3 className="font-bold text-gray-500 text-xs uppercase tracking-wide mb-2">
+              {group.label}
+            </h3>
+            <div className="flex flex-col gap-3">
+              {group.orders.map((order: Order, idx: number) => (
+                <div
+                  key={order.id.toString()}
+                  data-ocid={`admin.item.${idx + 1}`}
+                  className="bg-white rounded-xl border border-gray-100 shadow-xs p-3"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-bold text-gray-800 text-sm">
+                        Order #{Number(order.id)}
+                      </p>
+                      <p className="text-gray-400 text-[10px]">
+                        {formatDate(order.createdAt)}
+                      </p>
+                    </div>
+                    <span className="font-black text-green-700 text-base">
+                      ₹{Number(order.totalAmount) / 100}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 mb-1">
+                    <span className="font-semibold">{order.customerName}</span>{" "}
+                    · {order.customerPhone}
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2 line-clamp-1">
+                    {order.customerAddress}
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">
+                    {order.items.map((item) => (
+                      <div
+                        key={`${order.id}-${item.productId}-${item.quantityLabel}`}
+                      >
+                        {item.productName} &middot; {item.quantityLabel}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-500 mb-3">
+                    Payment: {order.paymentMethod}
+                    {Number(order.discountAmount) > 0 && (
+                      <span className="text-green-600 ml-2">
+                        Disc: -₹{Number(order.discountAmount) / 100}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      data-ocid={`admin.select.${idx + 1}`}
+                      value={order.status}
+                      onChange={(e) =>
+                        handleStatusChange(order.id, e.target.value)
+                      }
+                      className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:border-green-500"
+                    >
+                      <option value="Processing">Processing</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                    {order.status === "Delivered" && (
+                      <button
+                        type="button"
+                        data-ocid={`admin.delete_button.${idx + 1}`}
+                        onClick={() => handleDelete(order.id)}
+                        disabled={deleteOrderMutation.isPending}
+                        className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
 }
 
-// ─── Delivery Tab ─────────────────────────────────────────────────────────────
 function DeliveryTab() {
-  const { data: currentTiming } = useDeliveryTiming();
-  const setTiming = useSetDeliveryTiming();
-  const [value, setValue] = useState("");
+  const { data: current } = useDeliveryTiming();
+  const setDeliveryMutation = useSetDeliveryTiming();
+  const [timing, setTiming] = useState("");
 
   const handleSave = async () => {
-    if (!value.trim()) {
+    if (!timing.trim()) {
       toast.error("Please enter delivery timing");
       return;
     }
     try {
-      await setTiming.mutateAsync(value.trim());
+      await setDeliveryMutation.mutateAsync(timing.trim());
       toast.success("Delivery timing updated!");
-      setValue("");
+      setTiming("");
     } catch {
-      toast.error("Failed to update timing");
+      toast.error("Failed to update");
     }
   };
 
   return (
-    <div className="space-y-4">
-      {currentTiming && (
-        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
-          <p className="text-xs font-semibold text-muted-foreground mb-1">
+    <div className="flex flex-col gap-4">
+      {current && (
+        <div className="bg-green-50 rounded-xl px-4 py-3">
+          <p className="text-xs text-gray-500 font-semibold mb-0.5">
             Current Timing
           </p>
-          <p className="font-display font-bold text-foreground">
-            {currentTiming}
-          </p>
+          <p className="text-green-700 font-bold text-sm">{current}</p>
         </div>
       )}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">New Delivery Timing</Label>
-        <Input
-          data-ocid="admin.delivery.input"
-          placeholder="e.g. 9 AM - 1 PM"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+      <div>
+        <label htmlFor="delivery-timing">
+          <FieldLabel>New Delivery Timing</FieldLabel>
+        </label>
+        <input
+          id="delivery-timing"
+          data-ocid="admin.input"
+          type="text"
+          value={timing}
+          onChange={(e) => setTiming(e.target.value)}
+          placeholder="e.g. 10 AM – 6 PM"
+          className={ic}
         />
       </div>
-      <Button
-        data-ocid="admin.delivery.save_button"
-        className="w-full font-bold"
+      <button
+        type="button"
+        data-ocid="admin.save_button"
         onClick={handleSave}
-        disabled={setTiming.isPending}
+        disabled={setDeliveryMutation.isPending}
+        className="w-full bg-green-700 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60"
       >
-        {setTiming.isPending ? (
+        {setDeliveryMutation.isPending ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Saving...
           </>
         ) : (
-          "Save Timing"
+          "Save Delivery Timing"
         )}
-      </Button>
+      </button>
     </div>
   );
 }
 
-// ─── Discount Tab ─────────────────────────────────────────────────────────────
 function DiscountTab() {
   const { data: discountRaw } = useDiscount();
-  const setDiscount = useSetDiscount();
+  const setDiscountMutation = useSetDiscount();
+  const current = parseDiscount(discountRaw ?? "");
 
-  const parsed = parseDiscount(discountRaw ?? "");
-  const [percentage, setPercentage] = useState("");
-  const [minimumAmount, setMinimumAmount] = useState("");
-  const [flatAmount, setFlatAmount] = useState("");
-  const [flatMinimum, setFlatMinimum] = useState("");
-  const [freeItem, setFreeItem] = useState("");
-  const [freeItemMinimum, setFreeItemMinimum] = useState("");
+  const [pct, setPct] = useState(String(current?.percentage ?? ""));
+  const [pctMin, setPctMin] = useState(String(current?.minimumAmount ?? ""));
+  const [flat, setFlat] = useState(String(current?.flatAmount ?? ""));
+  const [flatMin, setFlatMin] = useState(String(current?.flatMinimum ?? ""));
+  const [freeItem, setFreeItem] = useState(current?.freeItem ?? "");
+  const [freeItemMin, setFreeItemMin] = useState(
+    String(current?.freeItemMinimum ?? ""),
+  );
 
   const handleSave = async () => {
-    const pct = Number(percentage);
-    const min = Number(minimumAmount);
-    const flat = Number(flatAmount);
-    const flatMin = Number(flatMinimum);
-    const freeItemValue = freeItem;
-    const freeItemMinValue = freeItemMinimum;
-    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
-      toast.error("Enter a valid percentage (0-100)");
-      return;
-    }
-    if (Number.isNaN(min) || min < 0) {
-      toast.error("Enter a valid minimum amount");
-      return;
-    }
-    if (Number.isNaN(flat) || flat < 0) {
-      toast.error("Enter a valid flat amount");
-      return;
-    }
-    if (Number.isNaN(flatMin) || flatMin < 0) {
-      toast.error("Enter a valid flat discount minimum");
-      return;
-    }
-    if (freeItemMinValue && Number.isNaN(Number(freeItemMinValue))) {
-      toast.error("Enter a valid minimum amount for free item");
-      return;
-    }
+    const payload = JSON.stringify({
+      percentage: Number.parseFloat(pct) || 0,
+      minimumAmount: Number.parseFloat(pctMin) || 0,
+      flatAmount: Number.parseFloat(flat) || 0,
+      flatMinimum: Number.parseFloat(flatMin) || 0,
+      freeItem: freeItem.trim(),
+      freeItemMinimum: Number.parseFloat(freeItemMin) || 0,
+    });
     try {
-      await setDiscount.mutateAsync(
-        JSON.stringify({
-          percentage: pct,
-          minimumAmount: min,
-          flatAmount: flat,
-          flatMinimum: flatMin,
-          freeItem: freeItemValue.trim(),
-          freeItemMinimum: Number(freeItemMinValue),
-        }),
-      );
-      toast.success("Discount updated!");
-      setPercentage("");
-      setMinimumAmount("");
-      setFlatAmount("");
-      setFlatMinimum("");
-      setFreeItem("");
-      setFreeItemMinimum("");
+      await setDiscountMutation.mutateAsync(payload);
+      toast.success("Discount settings saved!");
     } catch {
-      toast.error("Failed to update discount");
+      toast.error("Failed to save discount settings");
     }
   };
 
   return (
-    <div className="space-y-4">
-      {parsed &&
-        (parsed.percentage > 0 || parsed.flatAmount > 0 || parsed.freeItem) && (
-          <div className="bg-accent/20 border border-accent/40 rounded-xl p-4 space-y-1">
-            <p className="text-xs font-semibold text-muted-foreground mb-1">
-              Current Discount
-            </p>
-            {parsed.percentage > 0 && (
-              <p className="font-display font-bold text-accent-foreground">
-                {parsed.percentage}% off on orders above ₹{parsed.minimumAmount}
-              </p>
-            )}
-            {parsed.flatAmount > 0 && (
-              <p className="font-display font-bold text-accent-foreground">
-                ₹{parsed.flatAmount} off on orders above ₹{parsed.flatMinimum}
-              </p>
-            )}
-            {parsed.freeItem && (
-              <p className="font-display font-bold text-accent-foreground">
-                FREE {parsed.freeItem} on orders above ₹{parsed.freeItemMinimum}
-              </p>
-            )}
+    <div className="flex flex-col gap-5">
+      <div className="bg-gray-50 rounded-xl p-3">
+        <h4 className="font-display font-bold text-gray-700 text-sm mb-3">
+          💰 Percentage Discount
+        </h4>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="d-pct">
+              <FieldLabel>% Off</FieldLabel>
+            </label>
+            <input
+              id="d-pct"
+              data-ocid="admin.input"
+              className={ic}
+              type="number"
+              min="0"
+              max="100"
+              value={pct}
+              onChange={(e) => setPct(e.target.value)}
+              placeholder="e.g. 10"
+            />
           </div>
-        )}
-
-      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-        Percentage Discount
-      </p>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Discount Percentage (%)</Label>
-        <Input
-          data-ocid="admin.discount.input"
-          type="number"
-          placeholder={parsed ? String(parsed.percentage) : "e.g. 10"}
-          value={percentage}
-          onChange={(e) => setPercentage(e.target.value)}
-          min="0"
-          max="100"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">
-          Minimum Order Amount (₹)
-        </Label>
-        <Input
-          data-ocid="admin.discount.input"
-          type="number"
-          placeholder={parsed ? String(parsed.minimumAmount) : "e.g. 300"}
-          value={minimumAmount}
-          onChange={(e) => setMinimumAmount(e.target.value)}
-          min="0"
-        />
-      </div>
-
-      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-        Flat Amount Discount
-      </p>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Flat Amount Off (₹)</Label>
-        <Input
-          data-ocid="admin.discount.input"
-          type="number"
-          placeholder={parsed ? String(parsed.flatAmount) : "e.g. 50"}
-          value={flatAmount}
-          onChange={(e) => setFlatAmount(e.target.value)}
-          min="0"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">
-          Minimum Order for Flat Discount (₹)
-        </Label>
-        <Input
-          data-ocid="admin.discount.input"
-          type="number"
-          placeholder={parsed ? String(parsed.flatMinimum) : "e.g. 300"}
-          value={flatMinimum}
-          onChange={(e) => setFlatMinimum(e.target.value)}
-          min="0"
-        />
-      </div>
-
-      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-        Free Item Offer
-      </p>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">Free Item Description</Label>
-        <Input
-          data-ocid="admin.discount.input"
-          placeholder={parsed?.freeItem ? parsed.freeItem : "e.g. 1 kg Tomato"}
-          value={freeItem}
-          onChange={(e) => setFreeItem(e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold">
-          Minimum Order for Free Item (₹)
-        </Label>
-        <Input
-          data-ocid="admin.discount.input"
-          type="number"
-          placeholder={
-            parsed
-              ? String(parsed.freeItemMinimum || "") || "e.g. 500"
-              : "e.g. 500"
-          }
-          value={freeItemMinimum}
-          onChange={(e) => setFreeItemMinimum(e.target.value)}
-          min="0"
-        />
-      </div>
-
-      {(percentage || flatAmount || freeItem) && (
-        <div className="bg-secondary/60 rounded-lg px-3 py-2 text-xs text-muted-foreground space-y-0.5">
-          {percentage && minimumAmount && (
-            <p>
-              Preview: Customers get <strong>{percentage}%</strong> off on
-              orders above ₹{minimumAmount}
-            </p>
-          )}
-          {flatAmount && flatMinimum && (
-            <p>
-              Preview: Customers get <strong>₹{flatAmount}</strong> off on
-              orders above ₹{flatMinimum}
-            </p>
-          )}
-          {freeItem && freeItemMinimum && (
-            <p>
-              Preview: Customers get <strong>FREE {freeItem}</strong> on orders
-              above ₹{freeItemMinimum}
-            </p>
-          )}
+          <div>
+            <label htmlFor="d-pctmin">
+              <FieldLabel>Min Order (₹)</FieldLabel>
+            </label>
+            <input
+              id="d-pctmin"
+              data-ocid="admin.input"
+              className={ic}
+              type="number"
+              min="0"
+              value={pctMin}
+              onChange={(e) => setPctMin(e.target.value)}
+              placeholder="e.g. 300"
+            />
+          </div>
         </div>
-      )}
-
-      <Button
-        data-ocid="admin.discount.save_button"
-        className="w-full font-bold"
+      </div>
+      <div className="bg-gray-50 rounded-xl p-3">
+        <h4 className="font-display font-bold text-gray-700 text-sm mb-3">
+          ₹ Flat Amount Off
+        </h4>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="d-flat">
+              <FieldLabel>₹ Off</FieldLabel>
+            </label>
+            <input
+              id="d-flat"
+              data-ocid="admin.input"
+              className={ic}
+              type="number"
+              min="0"
+              value={flat}
+              onChange={(e) => setFlat(e.target.value)}
+              placeholder="e.g. 50"
+            />
+          </div>
+          <div>
+            <label htmlFor="d-flatmin">
+              <FieldLabel>Min Order (₹)</FieldLabel>
+            </label>
+            <input
+              id="d-flatmin"
+              data-ocid="admin.input"
+              className={ic}
+              type="number"
+              min="0"
+              value={flatMin}
+              onChange={(e) => setFlatMin(e.target.value)}
+              placeholder="e.g. 500"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="bg-gray-50 rounded-xl p-3">
+        <h4 className="font-display font-bold text-gray-700 text-sm mb-3">
+          🎁 Free Item Offer
+        </h4>
+        <div className="flex flex-col gap-3">
+          <div>
+            <label htmlFor="d-freeitem">
+              <FieldLabel>Free Item Name</FieldLabel>
+            </label>
+            <input
+              id="d-freeitem"
+              data-ocid="admin.input"
+              className={ic}
+              value={freeItem}
+              onChange={(e) => setFreeItem(e.target.value)}
+              placeholder="e.g. 1kg Tomato"
+            />
+          </div>
+          <div>
+            <label htmlFor="d-freemin">
+              <FieldLabel>Min Order (₹)</FieldLabel>
+            </label>
+            <input
+              id="d-freemin"
+              data-ocid="admin.input"
+              className={ic}
+              type="number"
+              min="0"
+              value={freeItemMin}
+              onChange={(e) => setFreeItemMin(e.target.value)}
+              placeholder="e.g. 500"
+            />
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        data-ocid="admin.save_button"
         onClick={handleSave}
-        disabled={setDiscount.isPending}
+        disabled={setDiscountMutation.isPending}
+        className="w-full bg-green-700 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60"
       >
-        {setDiscount.isPending ? (
+        {setDiscountMutation.isPending ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Saving...
           </>
         ) : (
-          "Save Discount"
+          "Save All Discounts"
         )}
-      </Button>
+      </button>
     </div>
   );
 }
 
-// ─── Profiles Tab ─────────────────────────────────────────────────────────────
 function ProfilesTab() {
   const { data: profiles, isLoading } = useProfiles();
-
-  if (isLoading) {
+  if (isLoading)
     return (
-      <div data-ocid="admin.profiles.loading_state" className="space-y-2">
-        {["pr1", "pr2", "pr3"].map((k) => (
-          <Skeleton key={k} className="h-16 w-full rounded-xl" />
-        ))}
-      </div>
+      <div className="py-8 text-center text-gray-400 text-sm">Loading...</div>
     );
-  }
-
-  if (!profiles?.length) {
+  if (!profiles || profiles.length === 0)
     return (
-      <div data-ocid="admin.profiles.empty_state" className="text-center py-12">
-        <Users className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-        <p className="text-sm text-muted-foreground">
-          No customer profiles yet.
-        </p>
-      </div>
+      <p
+        data-ocid="admin.empty_state"
+        className="text-center text-gray-400 text-sm py-8"
+      >
+        No customer profiles yet
+      </p>
     );
-  }
 
   return (
-    <div className="space-y-2">
-      {profiles.map((profile: CustomerProfile, idx: number) => (
+    <div className="flex flex-col gap-2">
+      {profiles.map((p, idx) => (
         <div
-          key={profile.phone}
-          data-ocid={`admin.profiles.item.${idx + 1}`}
-          className="bg-card rounded-xl p-3 shadow-xs"
+          key={p.phone}
+          data-ocid={`admin.item.${idx + 1}`}
+          className="bg-white rounded-xl border border-gray-100 shadow-xs p-3"
         >
-          <p className="font-display font-bold text-sm">{profile.name}</p>
-          <p className="text-xs text-muted-foreground">{profile.phone}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {profile.address}
+          <p className="font-bold text-gray-800 text-sm">{p.name}</p>
+          <p className="text-gray-500 text-xs">{p.phone}</p>
+          <p className="text-gray-400 text-xs mt-0.5 line-clamp-2">
+            {p.address}
           </p>
         </div>
       ))}
@@ -1146,227 +849,176 @@ function ProfilesTab() {
   );
 }
 
-// ─── Settings Tab ─────────────────────────────────────────────────────────────
 function SettingsTab() {
-  const { data: bannerEnabled } = useBannerEnabled();
-  const { data: bannerText } = useBannerText();
-
-  const setBannerEnabled = useSetBannerEnabled();
-  const setBannerText = useSetBannerText();
-
-  const [bannerHeadline, setBannerHeadline] = useState("");
-
-  // Sync input when data loads
-  useEffect(() => {
-    if (bannerText && !bannerHeadline) {
-      setBannerHeadline(bannerText);
-    }
-  }, [bannerText, bannerHeadline]);
-
-  const handleSaveBannerText = async () => {
-    if (!bannerHeadline.trim()) {
-      toast.error("Please enter banner headline text");
-      return;
-    }
-    try {
-      await setBannerText.mutateAsync(bannerHeadline.trim());
-      toast.success("Banner text updated!");
-    } catch {
-      toast.error("Failed to update banner text");
-    }
-  };
-
-  const handleBannerToggle = async (checked: boolean) => {
-    try {
-      await setBannerEnabled.mutateAsync(checked);
-      toast.success(checked ? "Hero banner enabled" : "Hero banner hidden");
-    } catch {
-      toast.error("Failed to update setting");
-    }
-  };
-
   return (
-    <div className="space-y-5">
-      <div className="bg-card rounded-xl p-4 shadow-xs space-y-4">
-        <h3 className="font-display font-bold text-sm text-foreground">
-          Homepage Display
-        </h3>
-
-        {/* Hero Banner Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">
-              Show Hero Banner
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Sliding banner at the top of the homepage
-            </p>
-          </div>
-          <Switch
-            data-ocid="admin.settings.toggle"
-            checked={bannerEnabled !== false}
-            onCheckedChange={handleBannerToggle}
-            disabled={setBannerEnabled.isPending}
-          />
-        </div>
-      </div>
-
-      {/* Banner Headline Text */}
-      <div className="bg-card rounded-xl p-4 shadow-xs space-y-3">
-        <h3 className="font-display font-bold text-sm text-foreground">
-          Banner Headline Text
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          Custom text shown on the first slide of the hero banner
+    <div className="bg-gray-50 rounded-xl p-4">
+      <p className="text-sm text-gray-600 font-semibold">🔧 App Settings</p>
+      <p className="text-xs text-gray-400 mt-2">
+        All key settings are managed through the Delivery, Discount, and
+        Products tabs.
+      </p>
+      <div className="mt-4 bg-white rounded-xl p-3 border border-gray-100">
+        <p className="text-xs font-bold text-gray-700">✔ Minimum Order</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Fixed at ₹99 — always shown in hero banner
         </p>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">Headline Text</Label>
-          <Input
-            data-ocid="admin.settings.input"
-            placeholder="e.g. Fresh Vegetables Daily"
-            value={bannerHeadline}
-            onChange={(e) => setBannerHeadline(e.target.value)}
-            maxLength={50}
-          />
-        </div>
-        <Button
-          data-ocid="admin.settings.save_button"
-          className="w-full font-bold"
-          onClick={handleSaveBannerText}
-          disabled={setBannerText.isPending}
-        >
-          {setBannerText.isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
-            </>
-          ) : (
-            "Save Banner Text"
-          )}
-        </Button>
+      </div>
+      <div className="mt-2 bg-white rounded-xl p-3 border border-gray-100">
+        <p className="text-xs font-bold text-gray-700">✔ Hero Banner</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Auto-shows delivery timing, discounts, and free delivery
+        </p>
       </div>
     </div>
   );
 }
 
-// ─── Admin Page ───────────────────────────────────────────────────────────────
-interface AdminPageProps {
-  onClose: () => void;
-}
+// ─── Main Admin Page ──────────────────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = "adita96319";
 
-export default function AdminPage({ onClose }: AdminPageProps) {
-  const [isAdmin, setIsAdmin] = useState(false);
+export default function AdminPage({ onClose }: { onClose: () => void }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => sessionStorage.getItem("brinjal_admin") === "true",
+  );
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [activeTab, setActiveTab] = useState<AdminTab>("products");
 
-  if (!isAdmin) {
+  const handleLogin = () => {
+    if (passwordInput === ADMIN_PASSWORD) {
+      sessionStorage.setItem("brinjal_admin", "true");
+      setIsAuthenticated(true);
+      setPasswordError("");
+    } else {
+      setPasswordError("Incorrect password");
+    }
+  };
+
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="flex items-center px-3 py-3 border-b border-gray-100">
-          <button
-            type="button"
-            data-ocid="admin.close_button"
-            onClick={onClose}
-            className="flex items-center gap-1.5 text-gray-600"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm font-medium">Back</span>
-          </button>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <span className="text-5xl">🌱</span>
+            <h1 className="font-display font-bold text-2xl text-gray-900 mt-3">
+              Admin Panel
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Enter your password to continue
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <input
+              data-ocid="admin.input"
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="Admin password"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-green-500"
+            />
+            {passwordError && (
+              <p
+                data-ocid="admin.error_state"
+                className="text-red-500 text-xs font-semibold"
+              >
+                {passwordError}
+              </p>
+            )}
+            <button
+              type="button"
+              data-ocid="admin.submit_button"
+              onClick={handleLogin}
+              className="w-full bg-green-700 text-white font-display font-bold py-3.5 rounded-xl text-base"
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              data-ocid="admin.close_button"
+              onClick={onClose}
+              className="w-full border border-gray-200 text-gray-600 font-bold py-3 rounded-xl text-sm"
+            >
+              ← Back to Shop
+            </button>
+          </div>
         </div>
-        <PasswordGate onSuccess={() => setIsAdmin(true)} />
       </div>
     );
   }
 
+  const TABS: { key: AdminTab; label: string; emoji: string }[] = [
+    { key: "products", label: "Products", emoji: "📦" },
+    { key: "orders", label: "Orders", emoji: "📋" },
+    { key: "delivery", label: "Delivery", emoji: "🚚" },
+    { key: "discount", label: "Discount", emoji: "🏷️" },
+    { key: "profiles", label: "Profiles", emoji: "👥" },
+    { key: "settings", label: "Settings", emoji: "⚙️" },
+  ];
+
   return (
     <div className="min-h-screen bg-white">
-      <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-3 border-b border-gray-100 bg-white">
+      <div
+        className="sticky top-0 z-40 px-3 py-2 flex items-center justify-between shadow-sm"
+        style={{
+          background: "linear-gradient(135deg, #14532d 0%, #15803d 100%)",
+        }}
+      >
+        <span className="text-white font-display font-bold text-base">
+          🔑 Admin Panel
+        </span>
         <button
           type="button"
           data-ocid="admin.close_button"
           onClick={onClose}
-          className="flex items-center gap-1.5 text-gray-600"
+          className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"
         >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm font-medium">Back</span>
+          <X className="w-4 h-4 text-white" />
         </button>
-        <h2 className="font-display text-base font-bold text-foreground">
-          Admin Panel
-        </h2>
-        <Button
-          size="sm"
-          variant="outline"
-          className="text-xs"
-          onClick={() => setIsAdmin(false)}
-        >
-          Logout
-        </Button>
       </div>
 
-      <div className="px-3 py-4">
-        <Tabs defaultValue="products">
-          <TabsList className="w-full grid grid-cols-6 mb-4">
-            <TabsTrigger
-              data-ocid="admin.products.tab"
-              value="products"
-              className="text-[10px]"
+      <div className="overflow-x-auto scrollbar-hide border-b border-gray-100">
+        <div className="flex px-2 py-1 gap-1 min-w-max">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              data-ocid={`admin.${tab.key}.tab`}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === tab.key
+                  ? "bg-green-700 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
             >
-              Products
-            </TabsTrigger>
-            <TabsTrigger
-              data-ocid="admin.orders.tab"
-              value="orders"
-              className="text-[10px]"
-            >
-              Orders
-            </TabsTrigger>
-            <TabsTrigger
-              data-ocid="admin.delivery.tab"
-              value="delivery"
-              className="text-[10px]"
-            >
-              Delivery
-            </TabsTrigger>
-            <TabsTrigger
-              data-ocid="admin.discount.tab"
-              value="discount"
-              className="text-[10px]"
-            >
-              Discount
-            </TabsTrigger>
-            <TabsTrigger
-              data-ocid="admin.profiles.tab"
-              value="profiles"
-              className="text-[10px]"
-            >
-              Profiles
-            </TabsTrigger>
-            <TabsTrigger
-              data-ocid="admin.settings.tab"
-              value="settings"
-              className="text-[10px]"
-            >
-              <Settings className="w-3 h-3 mr-0.5" />
-              Settings
-            </TabsTrigger>
-          </TabsList>
+              <span>{tab.emoji}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <TabsContent value="products">
-            <ProductsTab />
-          </TabsContent>
-          <TabsContent value="orders">
-            <OrdersTab />
-          </TabsContent>
-          <TabsContent value="delivery">
-            <DeliveryTab />
-          </TabsContent>
-          <TabsContent value="discount">
-            <DiscountTab />
-          </TabsContent>
-          <TabsContent value="profiles">
-            <ProfilesTab />
-          </TabsContent>
-          <TabsContent value="settings">
-            <SettingsTab />
-          </TabsContent>
-        </Tabs>
+      <div className="p-4">
+        {activeTab === "products" && <ProductsTab />}
+        {activeTab === "orders" && <OrdersTab />}
+        {activeTab === "delivery" && <DeliveryTab />}
+        {activeTab === "discount" && <DiscountTab />}
+        {activeTab === "profiles" && <ProfilesTab />}
+        {activeTab === "settings" && <SettingsTab />}
+      </div>
+
+      <div className="px-4 py-6 text-center">
+        <p className="text-xs text-gray-300">
+          &copy; {new Date().getFullYear()}. Built with love using{" "}
+          <a
+            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+            className="underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            caffeine.ai
+          </a>
+        </p>
       </div>
     </div>
   );

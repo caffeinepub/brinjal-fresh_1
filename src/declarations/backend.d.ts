@@ -1,14 +1,14 @@
 import type { ActorMethod } from '@dfinity/agent';
 
-export type UnitType = { kg: null } | { piece: null } | { bundle: null } | { packet: null };
-
 export interface Product {
   id: bigint;
   name: string;
-  unitType: UnitType;
-  pricePerUnit: bigint;
+  price: bigint;
   stock: bigint;
   imageId: string;
+  unitType: string;
+  productCategory: string;
+  description: string;
 }
 
 export interface OrderItem {
@@ -19,38 +19,62 @@ export interface OrderItem {
   itemTotal: bigint;
 }
 
-export interface CustomerOrder {
+export interface Order {
   id: bigint;
   customerName: string;
-  phone: string;
-  address: string;
+  customerPhone: string;
+  customerAddress: string;
+  paymentMethod: string;
   items: OrderItem[];
   subtotal: bigint;
   discountAmount: bigint;
+  discountType: string;
+  freeItem: string;
   totalAmount: bigint;
-  paymentMethod: string;
   status: string;
   createdAt: bigint;
 }
 
+export interface CustomerProfile {
+  phone: string;
+  name: string;
+  address: string;
+  updatedAt: bigint;
+}
+
 export interface DiscountSettings {
-  percentage: bigint;
-  minimumAmount: bigint;
+  percentageOff: bigint;
+  percentageMinOrder: bigint;
+  flatOff: bigint;
+  flatMinOrder: bigint;
+  freeItemName: string;
+  freeItemMinOrder: bigint;
+}
+
+export interface AppSettings {
+  heroBannerEnabled: boolean;
+  heroBannerHeadline: string;
 }
 
 export interface _SERVICE {
-  addProduct: ActorMethod<[string, UnitType, bigint, bigint, string], bigint>;
-  updateProduct: ActorMethod<[bigint, string, UnitType, bigint, bigint, string], void>;
-  deleteProduct: ActorMethod<[bigint], void>;
+  addProduct: ActorMethod<[string, bigint, bigint, string, string, string, string], bigint>;
   getProducts: ActorMethod<[], Product[]>;
-  placeOrder: ActorMethod<[string, string, string, OrderItem[], bigint, bigint, bigint, string], bigint>;
-  getOrders: ActorMethod<[], CustomerOrder[]>;
-  updateOrderStatus: ActorMethod<[bigint, string], void>;
-  deleteOrder: ActorMethod<[bigint], void>;
+  updateProduct: ActorMethod<[bigint, string, bigint, bigint, string, string, string, string], boolean>;
+  deleteProduct: ActorMethod<[bigint], boolean>;
+  placeOrder: ActorMethod<[string, string, string, string, OrderItem[], bigint, bigint, string, string, bigint], bigint>;
+  getOrders: ActorMethod<[], Order[]>;
+  getOrdersByPhone: ActorMethod<[string], Order[]>;
+  updateOrderStatus: ActorMethod<[bigint, string], boolean>;
+  deleteOrder: ActorMethod<[bigint], boolean>;
+  saveProfile: ActorMethod<[string, string, string], boolean>;
+  getProfile: ActorMethod<[string], [CustomerProfile] | []>;
+  getAllProfiles: ActorMethod<[], CustomerProfile[]>;
   getDeliveryTiming: ActorMethod<[], string>;
-  setDeliveryTiming: ActorMethod<[string], void>;
-  getDiscount: ActorMethod<[], DiscountSettings>;
-  setDiscount: ActorMethod<[bigint, bigint], void>;
+  setDeliveryTiming: ActorMethod<[string], boolean>;
+  getDiscountSettings: ActorMethod<[], DiscountSettings>;
+  setDiscountSettings: ActorMethod<[bigint, bigint, bigint, bigint, string, bigint], boolean>;
+  getAppSettings: ActorMethod<[], AppSettings>;
+  setAppSettings: ActorMethod<[boolean, string], boolean>;
   uploadBlob: ActorMethod<[Uint8Array, string], string>;
   getBlobUrl: ActorMethod<[string], string>;
 }

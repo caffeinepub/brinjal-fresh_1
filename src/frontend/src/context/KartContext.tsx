@@ -24,62 +24,72 @@ interface KartContextValue {
 
 const KartContext = createContext<KartContextValue | undefined>(undefined);
 
-/** Calculate the price for a given quantity option based on unit type (category). */
+/** Price multipliers for quantity options */
 export function getOptionPrice(
   basePrice: bigint,
   quantityOption: string,
 ): bigint {
-  // Weight-based (kg) — new 3-option set
+  // kg options
   if (quantityOption === "250g") return (basePrice * 25n) / 100n;
   if (quantityOption === "500g") return (basePrice * 50n) / 100n;
   if (quantityOption === "1kg") return basePrice;
-  // Legacy weight options (backwards compat)
+  // piece options
+  if (quantityOption === "1pc") return basePrice;
+  if (quantityOption === "2pc") return basePrice * 2n;
+  if (quantityOption === "5pc") return basePrice * 5n;
+  // bundle options
+  if (quantityOption === "1 bunch") return basePrice;
+  if (quantityOption === "2 bunch") return basePrice * 2n;
+  // packet options
+  if (quantityOption === "1 pkt") return basePrice;
+  if (quantityOption === "2 pkt") return basePrice * 2n;
+  // legacy compat
   if (quantityOption === "250gm") return (basePrice * 25n) / 100n;
   if (quantityOption === "500gm") return (basePrice * 50n) / 100n;
-  if (quantityOption === "750gm") return (basePrice * 75n) / 100n;
-  if (quantityOption === "2kg") return basePrice * 2n;
-  // Pieces
   if (quantityOption === "1 Piece") return basePrice;
   if (quantityOption === "2 Pieces") return basePrice * 2n;
-  if (quantityOption === "3 Pieces") return basePrice * 3n;
-  if (quantityOption === "5 Pieces") return basePrice * 5n;
-  // Bundles
   if (quantityOption === "1 Bundle") return basePrice;
   if (quantityOption === "2 Bundles") return basePrice * 2n;
-  if (quantityOption === "3 Bundles") return basePrice * 3n;
-  // Packets
   if (quantityOption === "1 Packet") return basePrice;
   if (quantityOption === "2 Packets") return basePrice * 2n;
-  if (quantityOption === "3 Packets") return basePrice * 3n;
   return basePrice;
 }
 
-/** Get quantity options list for a given unit type (category). */
-export function getQuantityOptions(category: string): string[] {
-  switch (category) {
+/** Get quantity options for a given unit type */
+export function getQuantityOptions(unitType: string): string[] {
+  switch (unitType) {
     case "piece":
-      return ["1 Piece", "2 Pieces", "3 Pieces", "5 Pieces"];
+      return ["1pc", "2pc", "5pc"];
     case "bundle":
-      return ["1 Bundle", "2 Bundles", "3 Bundles"];
+      return ["1 bunch", "2 bunch"];
     case "packet":
-      return ["1 Packet", "2 Packets", "3 Packets"];
-    default: // kg — 3 options only
+      return ["1 pkt", "2 pkt"];
+    default: // kg
       return ["250g", "500g", "1kg"];
   }
 }
 
-/** Format unit label for price display */
-export function getUnitLabel(category: string): string {
-  switch (category) {
+/** Unit label for price display */
+export function getUnitLabel(unitType: string): string {
+  switch (unitType) {
     case "piece":
-      return "/piece";
+      return "/pc";
     case "bundle":
-      return "/bundle";
+      return "/bunch";
     case "packet":
-      return "/packet";
+      return "/pkt";
     default:
       return "/kg";
   }
+}
+
+/** Build a human-readable quantity label like '2 × 1kg' */
+export function buildQuantityLabel(
+  quantityOption: string,
+  count: number,
+): string {
+  if (count === 1) return quantityOption;
+  return `${count} × ${quantityOption}`;
 }
 
 export function KartProvider({ children }: { children: ReactNode }) {
@@ -135,7 +145,7 @@ export function KartProvider({ children }: { children: ReactNode }) {
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = items.reduce(
     (sum, i) => sum + i.itemPrice * BigInt(i.quantity),
-    BigInt(0),
+    0n,
   );
 
   return (

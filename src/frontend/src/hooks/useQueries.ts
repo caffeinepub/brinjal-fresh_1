@@ -53,6 +53,7 @@ export function useOrders() {
       return actor.getOrders();
     },
     enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
   });
 }
 
@@ -79,136 +80,6 @@ export function useProfiles() {
       return actor.getProfiles();
     },
     enabled: !!actor && !isFetching,
-  });
-}
-
-export function useBannerEnabled() {
-  const { actor, isFetching } = useActor();
-  return useQuery<boolean>({
-    queryKey: ["bannerEnabled"],
-    queryFn: async () => {
-      if (!actor) return true;
-      try {
-        return await (actor as any).getBannerEnabled();
-      } catch {
-        return true;
-      }
-    },
-    enabled: !!actor && !isFetching,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
-}
-
-export function useTrustBadgesEnabled() {
-  const { actor, isFetching } = useActor();
-  return useQuery<boolean>({
-    queryKey: ["trustBadgesEnabled"],
-    queryFn: async () => {
-      if (!actor) return true;
-      try {
-        return await (actor as any).getTrustBadgesEnabled();
-      } catch {
-        return true;
-      }
-    },
-    enabled: !!actor && !isFetching,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
-}
-
-export function useBannerText() {
-  const { actor, isFetching } = useActor();
-  return useQuery<string>({
-    queryKey: ["bannerText"],
-    queryFn: async () => {
-      if (!actor) return "Fresh Vegetables Daily";
-      try {
-        const text = await (actor as any).getBannerText();
-        return text || "Fresh Vegetables Daily";
-      } catch {
-        return "Fresh Vegetables Daily";
-      }
-    },
-    enabled: !!actor && !isFetching,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
-}
-
-export function useMinimumOrder() {
-  const { actor, isFetching } = useActor();
-  return useQuery<number>({
-    queryKey: ["minimumOrder"],
-    queryFn: async () => {
-      if (!actor) return 0;
-      try {
-        const val = await (actor as any).getMinimumOrder();
-        return Number(val);
-      } catch {
-        return 0;
-      }
-    },
-    enabled: !!actor && !isFetching,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
-}
-
-export function useSetBannerEnabled() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (enabled: boolean) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).setBannerEnabled(enabled);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["bannerEnabled"] });
-    },
-  });
-}
-
-export function useSetTrustBadgesEnabled() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (enabled: boolean) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).setTrustBadgesEnabled(enabled);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["trustBadgesEnabled"] });
-    },
-  });
-}
-
-export function useSetBannerText() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (text: string) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).setBannerText(text);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["bannerText"] });
-    },
-  });
-}
-
-export function useSetMinimumOrder() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (amount: number) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).setMinimumOrder(BigInt(amount));
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["minimumOrder"] });
-    },
   });
 }
 
@@ -351,7 +222,7 @@ export function useDeleteOrder() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).deleteOrder(id);
+      return actor.deleteOrder(id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -414,16 +285,16 @@ export function parseDiscount(raw: string): {
   freeItem: string;
   freeItemMinimum: number;
 } | null {
+  if (!raw) return null;
   try {
-    if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (
       typeof parsed.percentage === "number" &&
       typeof parsed.minimumAmount === "number"
     ) {
       return {
-        percentage: parsed.percentage,
-        minimumAmount: parsed.minimumAmount,
+        percentage: parsed.percentage || 0,
+        minimumAmount: parsed.minimumAmount || 0,
         flatAmount:
           typeof parsed.flatAmount === "number" ? parsed.flatAmount : 0,
         flatMinimum:

@@ -16,8 +16,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Cabinet Grotesk", "sans-serif"],
-        body: ["Plus Jakarta Sans", "sans-serif"],
+        display: ["Bricolage Grotesque", "sans-serif"],
+        body: ["Figtree", "sans-serif"],
+        sans: ["Figtree", "sans-serif"],
       },
       colors: {
         border: "oklch(var(--border))",
@@ -77,9 +78,9 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        card: "0 4px 16px oklch(0.18 0.06 145 / 0.12)",
-        "card-lg": "0 12px 32px oklch(0.18 0.06 145 / 0.18)",
-        xs: "0 1px 2px 0 rgba(0,0,0,0.05)",
+        card: "0 2px 8px oklch(0.3 0.12 145 / 0.12)",
+        "card-lg": "0 8px 24px oklch(0.3 0.12 145 / 0.20)",
+        xs: "0 1px 2px 0 rgba(0,0,0,0.06)",
       },
       keyframes: {
         "accordion-down": {
@@ -91,19 +92,19 @@ export default {
           to: { height: "0" },
         },
         "fade-up": {
-          from: { opacity: "0", transform: "translateY(16px)" },
+          from: { opacity: "0", transform: "translateY(12px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
-        "slide-in": {
-          from: { opacity: "0", transform: "translateX(-12px)" },
+        "slide-in-right": {
+          from: { opacity: "0", transform: "translateX(12px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-up": "fade-up 0.4s ease-out",
-        "slide-in": "slide-in 0.3s ease-out",
+        "fade-up": "fade-up 0.35s ease-out",
+        "slide-in-right": "slide-in-right 0.3s ease-out",
       },
     },
   },

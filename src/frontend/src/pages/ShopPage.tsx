@@ -1,727 +1,209 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { Barcode, ChevronRight, Mic, Plus, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { ChevronRight, Search } from "lucide-react";
+import { useRef, useState } from "react";
 import type { Product } from "../backend";
-import {
-  getOptionPrice,
-  getQuantityOptions,
-  getUnitLabel,
-  useKart,
-} from "../context/KartContext";
-import {
-  parseDiscount,
-  useBannerEnabled,
-  useBannerText,
-  useDeliveryTiming,
-  useDiscount,
-  useProducts,
-} from "../hooks/useQueries";
-import { useStorageClient } from "../hooks/useStorageClient";
+import { HeroBanner } from "../components/HeroBanner";
+import { ProductCardCompact, ProductCardWide } from "../components/ProductCard";
+import { useProducts } from "../hooks/useQueries";
 
-// ─── Product Image ─────────────────────────────────────────────────────────────
-function ProductImage({ imageId }: { imageId: string }) {
-  const storageClient = useStorageClient();
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!imageId || !storageClient) return;
-    storageClient
-      .getDirectURL(imageId)
-      .then(setUrl)
-      .catch(() => setUrl(null));
-  }, [imageId, storageClient]);
-
-  if (!imageId || !url) {
-    return (
-      <div className="w-full aspect-square bg-green-50 flex items-center justify-center">
-        <span className="text-4xl">🥦</span>
-      </div>
-    );
-  }
-  return (
-    <div className="w-full aspect-square bg-secondary overflow-hidden">
-      <img src={url} alt="product" className="w-full h-full object-cover" />
-    </div>
-  );
-}
-
-// ─── Tiny Product Image ────────────────────────────────────────────────────────
-function TinyProductImage({ imageId }: { imageId: string }) {
-  const storageClient = useStorageClient();
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!imageId || !storageClient) return;
-    storageClient
-      .getDirectURL(imageId)
-      .then(setUrl)
-      .catch(() => setUrl(null));
-  }, [imageId, storageClient]);
-
-  if (!url) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <span className="text-2xl">🥦</span>
-      </div>
-    );
-  }
-  return <img src={url} alt="product" className="w-full h-full object-cover" />;
-}
-
-// ─── Quantity Buttons ─────────────────────────────────────────────────────────
-function QuantityButtons({
-  options,
-  selected,
-  onSelect,
-  tiny,
-}: {
-  options: string[];
-  selected: string;
-  onSelect: (opt: string) => void;
-  tiny?: boolean;
-}) {
-  const visible = options.slice(0, 3);
-  return (
-    <div className="flex gap-1">
-      {visible.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          onClick={() => onSelect(opt)}
-          className={`flex-1 ${
-            tiny ? "text-[8px]" : "text-[10px]"
-          } font-bold py-1 px-0.5 rounded-lg border transition-all duration-150 ${
-            selected === opt
-              ? "bg-green-700 text-white border-green-700 scale-105 shadow-sm"
-              : "bg-white text-gray-600 border-gray-300 hover:border-green-400"
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Product Card ──────────────────────────────────────────────────────────────
-/** compact = normal row card (w-44), tiny = first row small card (3 visible at once) */
-function ProductCard({
-  product,
-  compact,
-  tiny,
-}: { product: Product; compact?: boolean; tiny?: boolean }) {
-  const { addToKart } = useKart();
-
-  const unitType = product.unitType || (product as any).category || "kg";
-  const options = getQuantityOptions(unitType);
-  const [selectedOption, setSelectedOption] = useState(options[0]);
-
-  const basePrice = Number(product.price);
-  const unitLabel = getUnitLabel(unitType);
-  const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
-  const name = product.name || "";
-  const inStock = Number(product.stock) > 0;
-
-  const handleAdd = () => {
-    if (!inStock) return;
-    addToKart(product, selectedOption);
-    toast.success(`${name} added to kart!`);
-  };
-
-  const widthClass = tiny
-    ? "w-[30vw] min-w-[95px] max-w-[115px] shrink-0"
-    : compact
-      ? "w-44 shrink-0"
-      : "";
-
-  return (
-    <div
-      className={`bg-white rounded-xl shadow-md overflow-hidden flex flex-col border border-gray-100 transition-all duration-200 ${widthClass}`}
-    >
-      {/* Product image */}
-      <div className="relative rounded-t-xl overflow-hidden">
-        {tiny ? (
-          <div className="w-full aspect-[4/3] bg-green-50 overflow-hidden">
-            {product.imageId ? (
-              <TinyProductImage imageId={product.imageId} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-2xl">🥦</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <ProductImage imageId={product.imageId} />
-        )}
-        {!inStock && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="text-white text-[9px] font-bold bg-red-500 px-1.5 py-0.5 rounded">
-              Out of Stock
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className={`${tiny ? "p-1.5" : "p-2"} flex flex-col gap-1 flex-1`}>
-        {/* Product name */}
-        <h3
-          className={`font-bold text-gray-800 ${tiny ? "text-[9px]" : "text-xs"} leading-tight text-center line-clamp-2`}
-        >
-          {name}
-        </h3>
-
-        {/* Price row */}
-        <div className="flex items-baseline gap-0.5 justify-center">
-          <span
-            className={`text-red-600 font-black ${tiny ? "text-base" : "text-xl"} leading-none`}
-          >
-            ₹{basePrice}
-          </span>
-          <span
-            className={`text-gray-600 ${tiny ? "text-[9px]" : "text-xs"} font-semibold`}
-          >
-            {unitLabel}
-          </span>
-        </div>
-
-        {/* Quantity buttons */}
-        <QuantityButtons
-          options={options}
-          selected={selectedOption}
-          onSelect={setSelectedOption}
-          tiny={tiny}
-        />
-
-        {/* Bottom row: calculated price + Add button */}
-        <div className="flex items-center gap-1 mt-0.5">
-          <span
-            className={`text-red-500 font-black ${tiny ? "text-sm" : "text-base"} leading-none shrink-0`}
-          >
-            ₹{calculatedPrice}
-          </span>
-          <button
-            type="button"
-            data-ocid="shop.product.button"
-            onClick={handleAdd}
-            disabled={!inStock}
-            className={`flex-1 bg-green-700 text-white font-bold ${tiny ? "text-[10px] py-1 px-1" : "text-sm py-1.5 px-3"} rounded-lg flex items-center justify-center gap-0.5 disabled:opacity-50 disabled:bg-gray-400 transition-colors`}
-          >
-            <Plus className={tiny ? "w-3 h-3" : "w-3.5 h-3.5"} />
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Horizontal Product Card (second row) ─────────────────────────────────────
-/** Vertical card: image on TOP, details BOTTOM. 2 visible at a time. */
-function HorizontalProductCard({ product }: { product: Product }) {
-  const { addToKart } = useKart();
-
-  const unitType = product.unitType || (product as any).category || "kg";
-  const options = getQuantityOptions(unitType);
-  const [selectedOption, setSelectedOption] = useState(options[0]);
-
-  const basePrice = Number(product.price);
-  const unitLabel = getUnitLabel(unitType);
-  const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
-  const name = product.name || "";
-  const inStock = Number(product.stock) > 0;
-  const description = (product as any).description || "";
-
-  const handleAdd = () => {
-    if (!inStock) return;
-    addToKart(product, selectedOption);
-    toast.success(`${name} added to kart!`);
-  };
-
-  return (
-    <div
-      className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col border border-gray-100 shrink-0"
-      style={{ width: "calc(50vw - 18px)", minWidth: 150, maxWidth: 200 }}
-    >
-      {/* Top: image */}
-      <div
-        className="relative w-full overflow-hidden bg-green-50"
-        style={{ height: 110 }}
-      >
-        {product.imageId ? (
-          <TinyProductImage imageId={product.imageId} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-3xl">🥦</span>
-          </div>
-        )}
-        {!inStock && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="text-white text-[9px] font-bold bg-red-500 px-1.5 py-0.5 rounded">
-              Out of Stock
-            </span>
-          </div>
-        )}
-      </div>
-      {/* Bottom: details */}
-      <div className="flex-1 p-2 flex flex-col gap-1 min-w-0">
-        <h3 className="font-bold text-gray-800 text-[11px] leading-tight line-clamp-1">
-          {name}
-        </h3>
-        {description ? (
-          <p className="text-gray-500 text-[9px] leading-tight line-clamp-2">
-            {description}
-          </p>
-        ) : null}
-        <div className="flex items-baseline gap-0.5">
-          <span className="text-red-600 font-black text-base leading-none">
-            ₹{basePrice}
-          </span>
-          <span className="text-gray-500 text-[9px] font-semibold">
-            {unitLabel}
-          </span>
-        </div>
-        {/* Qty buttons */}
-        <div className="flex gap-0.5">
-          {options.slice(0, 3).map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => setSelectedOption(opt)}
-              className={`flex-1 text-[9px] font-bold py-0.5 rounded border transition-all ${
-                selectedOption === opt
-                  ? "bg-green-700 text-white border-green-700"
-                  : "bg-white text-gray-600 border-gray-300"
-              }`}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-        {/* Price + Add */}
-        <div className="flex items-center gap-1 mt-auto">
-          <span className="text-red-500 font-black text-sm leading-none shrink-0">
-            ₹{calculatedPrice}
-          </span>
-          <button
-            type="button"
-            data-ocid="shop.product.button"
-            onClick={handleAdd}
-            disabled={!inStock}
-            className="flex-1 bg-green-700 text-white font-bold text-[10px] py-1 rounded-lg flex items-center justify-center gap-0.5 disabled:opacity-50 disabled:bg-gray-400"
-          >
-            <Plus className="w-2.5 h-2.5" />
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Hero Banner ───────────────────────────────────────────────────────────────
-function HeroBanner({
-  bannerText,
-  deliveryTiming,
-  discount,
-}: {
-  bannerText: string;
-  deliveryTiming: string;
-  discount: ReturnType<typeof parseDiscount>;
-}) {
-  const [slide, setSlide] = useState(0);
-
-  let discountSlide: {
-    emoji: string;
-    headline: string;
-    sub: string;
-    gradient: string;
-  } | null = null;
-  if (discount) {
-    const hasDiscount =
-      discount.percentage > 0 ||
-      discount.flatAmount > 0 ||
-      discount.freeItem !== "";
-    if (hasDiscount) {
-      let headline = "";
-      if (discount.freeItem && discount.freeItemMinimum > 0) {
-        headline = `FREE ${discount.freeItem} on orders above ₹${discount.freeItemMinimum}`;
-      } else if (discount.percentage > 0) {
-        headline = `${discount.percentage}% OFF on orders above ₹${discount.minimumAmount}`;
-      } else if (discount.flatAmount > 0) {
-        headline = `₹${discount.flatAmount} OFF on orders above ₹${discount.flatMinimum}`;
-      }
-      discountSlide = {
-        emoji: "🎉",
-        headline,
-        sub: "Special Offer Just For You",
-        gradient:
-          "linear-gradient(135deg, #5c1a00 0%, #b03000 60%, #e84800 100%)",
-      };
-    }
-  }
-
-  // Fixed minimum order slide — always present
-  const minimumOrderSlide = {
-    emoji: "🛒",
-    headline: "Minimum order up to 99₹",
-    sub: "Place orders worth ₹99 or more",
-    gradient: "linear-gradient(135deg, #4a1a00 0%, #7a3000 60%, #a04000 100%)",
-  };
-
-  const slides = [
-    minimumOrderSlide,
-    {
-      emoji: "🥦",
-      headline: bannerText || "Fresh Vegetables Daily",
-      sub: "Order Now for Same Day Delivery",
-      gradient:
-        "linear-gradient(135deg, #0d4a1a 0%, #1a7a30 60%, #2ea84a 100%)",
-    },
-    {
-      emoji: "🚚",
-      headline: "Free Delivery on Every Order",
-      sub: "No extra charges, ever",
-      gradient:
-        "linear-gradient(135deg, #1a3a5c 0%, #1e5f99 60%, #2980cc 100%)",
-    },
-    {
-      emoji: "⏰",
-      headline: deliveryTiming || "Fast Delivery",
-      sub: "Today's Delivery Timing",
-      gradient:
-        "linear-gradient(135deg, #0a3d1f 0%, #145c30 60%, #1e7a40 100%)",
-    },
-    ...(discountSlide ? [discountSlide] : []),
-  ];
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSlide((prev) => (prev + 1) % slides.length);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [slides.length]);
-
-  const currentSlideIdx = slide % slides.length;
-  const current = slides[currentSlideIdx];
-
-  return (
-    <div
-      data-ocid="shop.hero.panel"
-      className="mx-3 mb-2 rounded-2xl overflow-hidden shadow-lg relative"
-      style={{ height: 91 }}
-    >
-      <div
-        className="absolute inset-0 flex items-center transition-all duration-500"
-        style={{ background: current.gradient }}
-      >
-        {/* Left: text content — half width */}
-        <div className="w-1/2 flex items-center gap-2 pl-3 pr-1">
-          <span className="text-2xl shrink-0">{current.emoji}</span>
-          <div className="min-w-0">
-            <p className="text-white font-black text-sm leading-snug drop-shadow line-clamp-2">
-              {current.headline}
-            </p>
-            <p className="text-white/80 text-[10px] font-semibold">
-              {current.sub}
-            </p>
-          </div>
-        </div>
-        {/* Right: vegetable image — half width */}
-        <div className="w-1/2 h-full relative shrink-0 overflow-hidden">
-          <img
-            src="/assets/generated/hero-vegetables-group.dim_600x200.jpg"
-            alt="Fresh Vegetables"
-            className="w-full h-full object-cover"
-            style={{ objectPosition: "center" }}
-          />
-          {/* gradient overlay to blend with slide */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Dot indicators */}
-      <div className="absolute bottom-2 right-3 flex gap-1.5 z-10">
-        {slides.map((slideItem, i) => (
-          <button
-            key={slideItem.headline}
-            type="button"
-            aria-label={`Slide ${i + 1}`}
-            onClick={() => setSlide(i)}
-            className={`rounded-full transition-all duration-300 ${
-              currentSlideIdx === i ? "w-4 h-2 bg-white" : "w-2 h-2 bg-white/50"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Category Pill Strip ───────────────────────────────────────────────────────
-function CategoryPillStrip({
-  onPillClick,
-}: {
-  onPillClick: (key: string) => void;
-}) {
-  const [active, setActive] = useState("");
-
-  const pills = [
-    { key: "vegetables", label: "🥦 Vegetables" },
-    { key: "leafy", label: "🍃 Leafy Veg" },
-    { key: "combo", label: "📦 Combo Pack" },
-    { key: "fruits", label: "🍎 Fruits" },
-    { key: "roots", label: "🥕 Root Veg" },
-  ];
-
-  const handleClick = (key: string) => {
-    setActive(key === active ? "" : key);
-    onPillClick(key);
-  };
-
-  return (
-    <div className="px-3 mb-2">
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {pills.map((pill) => (
-          <button
-            key={pill.key}
-            type="button"
-            data-ocid="shop.filter.tab"
-            onClick={() => handleClick(pill.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border-2 transition-all duration-200 ${
-              active === pill.key
-                ? "bg-green-700 text-white border-green-700 shadow-sm"
-                : "bg-white text-green-800 border-green-300 hover:border-green-500"
-            }`}
-          >
-            {pill.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Category Images ───────────────────────────────────────────────────────────
 const CATEGORIES = [
   {
-    label: "Vegetables",
-    img: "/assets/generated/category-vegetables.dim_300x200.jpg",
     key: "vegetables",
+    label: "Vegetables",
+    emoji: "🥦",
+    img: "/assets/generated/category-vegetables.dim_300x200.jpg",
   },
   {
-    label: "Fruits",
-    img: "/assets/generated/category-fruits.dim_300x200.jpg",
     key: "fruits",
+    label: "Fruits",
+    emoji: "🍎",
+    img: "/assets/generated/category-fruits.dim_300x200.jpg",
   },
   {
-    label: "Leafy Veg",
-    img: "/assets/generated/category-leafy.dim_300x200.jpg",
     key: "leafy",
+    label: "Leafy Veg",
+    emoji: "🌿",
+    img: "/assets/generated/category-leafy.dim_300x200.jpg",
   },
   {
-    label: "Root Veg",
-    img: "/assets/generated/category-roots.dim_300x200.jpg",
     key: "roots",
+    label: "Root Veg",
+    emoji: "🥕",
+    img: "/assets/generated/category-roots.dim_300x200.jpg",
   },
   {
-    label: "Combo Pack",
-    img: "/assets/generated/category-combo.dim_300x200.jpg",
     key: "combo",
-    badge: "Hot",
+    label: "Combo Pack",
+    emoji: "📦",
+    img: "/assets/generated/category-combo.dim_300x200.jpg",
   },
 ];
 
-// ─── Product Row Types ─────────────────────────────────────────────────────────
 interface ProductRow {
   label: string;
   categoryKey: string;
   products: Product[];
-  isFirst?: boolean;
-  isSecond?: boolean;
+  isFirst: boolean;
 }
 
-function buildProductRows(filtered: Product[]): ProductRow[] {
-  const vegetables: Product[] = [];
-  const fruits: Product[] = [];
-  const leafy: Product[] = [];
-  const roots: Product[] = [];
-  const combo: Product[] = [];
+function buildProductRows(products: Product[]): ProductRow[] {
+  const groups: Record<string, Product[]> = {
+    vegetables: [],
+    fruits: [],
+    leafy: [],
+    roots: [],
+    combo: [],
+  };
 
-  for (const p of filtered) {
+  for (const p of products) {
     const cat = (p.productCategory || "").toLowerCase();
-    if (cat.includes("fruit")) {
-      fruits.push(p);
-    } else if (cat.includes("leafy")) {
-      leafy.push(p);
-    } else if (cat.includes("root")) {
-      roots.push(p);
-    } else if (cat.includes("combo")) {
-      combo.push(p);
-    } else {
-      vegetables.push(p);
-    }
+    if (cat.includes("fruit")) groups.fruits.push(p);
+    else if (cat.includes("leafy")) groups.leafy.push(p);
+    else if (cat.includes("root")) groups.roots.push(p);
+    else if (cat.includes("combo")) groups.combo.push(p);
+    else groups.vegetables.push(p);
   }
 
   const rows: ProductRow[] = [];
 
-  if (vegetables.length > 0) {
-    const half = Math.ceil(vegetables.length / 2);
+  // Vegetables: split into two rows
+  const vegs = groups.vegetables;
+  if (vegs.length > 0) {
+    const half = Math.ceil(vegs.length / 2);
     rows.push({
       label: "🥦 Fresh Vegetables",
       categoryKey: "vegetables",
-      products: vegetables.slice(0, half),
+      products: vegs.slice(0, half),
+      isFirst: rows.length === 0,
     });
-    if (vegetables.length > half) {
+    if (vegs.length > half) {
       rows.push({
         label: "🥦 Fresh Vegetables",
         categoryKey: "vegetables",
-        products: vegetables.slice(half),
+        products: vegs.slice(half),
+        isFirst: false,
       });
     }
   }
 
-  if (leafy.length > 0) {
+  if (groups.leafy.length > 0)
     rows.push({
       label: "🌿 Leafy Vegetables",
       categoryKey: "leafy",
-      products: leafy,
+      products: groups.leafy,
+      isFirst: false,
     });
-  }
 
-  if (combo.length > 0) {
+  if (groups.combo.length > 0)
     rows.push({
       label: "📦 Combo Pack",
       categoryKey: "combo",
-      products: combo,
+      products: groups.combo,
+      isFirst: false,
     });
-  }
 
-  if (fruits.length > 0) {
-    rows.push({ label: "🍎 Fruits", categoryKey: "fruits", products: fruits });
-  }
+  if (groups.fruits.length > 0)
+    rows.push({
+      label: "🍎 Fruits",
+      categoryKey: "fruits",
+      products: groups.fruits,
+      isFirst: false,
+    });
 
-  if (roots.length > 0) {
+  if (groups.roots.length > 0)
     rows.push({
       label: "🥕 Root Vegetables",
       categoryKey: "roots",
-      products: roots,
+      products: groups.roots,
+      isFirst: false,
     });
-  }
 
-  if (rows.length > 0) {
-    rows[0] = { ...rows[0], isFirst: true };
-  }
-  if (rows.length > 1) {
-    rows[1] = { ...rows[1], isSecond: true };
-  }
+  // Mark the very first row
+  if (rows.length > 0) rows[0] = { ...rows[0], isFirst: true };
 
   return rows;
 }
 
-// ─── Shop Page ─────────────────────────────────────────────────────────────────
-interface ShopPageProps {
-  onOpenAdmin: () => void;
-}
-
-export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
+export default function ShopPage({ onOpenAdmin }: { onOpenAdmin: () => void }) {
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("all");
+  const [activePill, setActivePill] = useState("");
   const { data: products, isLoading } = useProducts();
-  const { data: deliveryTiming } = useDeliveryTiming();
-  const { data: discountRaw } = useDiscount();
-  const { data: bannerEnabled } = useBannerEnabled();
-  const { data: bannerText } = useBannerText();
 
-  const discount = parseDiscount(discountRaw ?? "");
-
-  // Refs for category pill scroll navigation
-  const vegetablesRef = useRef<HTMLDivElement>(null);
-  const leafyRef = useRef<HTMLDivElement>(null);
-  const comboRef = useRef<HTMLDivElement>(null);
-  const fruitsRef = useRef<HTMLDivElement>(null);
-  const rootsRef = useRef<HTMLDivElement>(null);
-
-  const categoryRefs: Record<string, React.RefObject<HTMLDivElement | null>> = {
-    vegetables: vegetablesRef,
-    leafy: leafyRef,
-    combo: comboRef,
-    fruits: fruitsRef,
-    roots: rootsRef,
+  const refs: Record<string, React.RefObject<HTMLDivElement | null>> = {
+    vegetables: useRef<HTMLDivElement>(null),
+    fruits: useRef<HTMLDivElement>(null),
+    leafy: useRef<HTMLDivElement>(null),
+    roots: useRef<HTMLDivElement>(null),
+    combo: useRef<HTMLDivElement>(null),
   };
 
-  const handleSearchChange = (value: string) => {
-    if (value.toLowerCase().trim() === "admin panel") {
+  const handleSearchChange = (val: string) => {
+    if (val.toLowerCase().trim() === "admin panel") {
       onOpenAdmin();
       setSearch("");
       return;
     }
-    setSearch(value);
+    setSearch(val);
   };
 
   const handlePillClick = (key: string) => {
-    const ref = categoryRefs[key];
+    setActivePill(key === activePill ? "" : key);
+    const ref = refs[key];
     if (ref?.current) {
       ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
   const filtered = (products ?? []).filter((p: Product) => {
-    const name = p.name || "";
-    const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
-    if (activeCategory === "all") return matchesSearch;
-    const cat = (p.productCategory || (p as any).category || "").toLowerCase();
-    return matchesSearch && cat.includes(activeCategory);
+    if (!search) return true;
+    return (p.name || "").toLowerCase().includes(search.toLowerCase());
   });
 
   const productRows = buildProductRows(filtered);
 
-  // Determine if banner should show (default true if data not loaded yet)
-  const showBanner = bannerEnabled !== false;
-
   return (
     <div className="pb-2">
       {/* Search bar */}
-      <div className="px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 shadow-xs border border-gray-100">
-          <Search className="w-4 h-4 text-gray-400 shrink-0" />
+      <div className="px-3 pt-2 pb-1.5">
+        <div
+          className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-gray-200 shadow-xs"
+          style={{ height: 36 }}
+        >
+          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
           <input
             data-ocid="shop.search_input"
             type="text"
-            placeholder="Search Vegetables & Fruits..."
+            placeholder="Search products..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
           />
-          <button
-            type="button"
-            aria-label="Voice search"
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ backgroundColor: "#1a5c2a" }}
-          >
-            <Mic className="w-4 h-4 text-white" />
-          </button>
-          <Barcode className="w-5 h-5 text-gray-400 shrink-0" />
         </div>
       </div>
 
-      {/* Hero Sliding Banner */}
-      {showBanner && (
-        <HeroBanner
-          bannerText={bannerText ?? "Fresh Vegetables Daily"}
-          deliveryTiming={deliveryTiming ?? ""}
-          discount={discount}
-        />
-      )}
+      {/* Hero Banner */}
+      <HeroBanner bannerHeadline="Fresh Vegetables Daily" />
 
-      {/* Category Pill Strip */}
-      <CategoryPillStrip onPillClick={handlePillClick} />
+      {/* Category pill strip */}
+      <div className="px-3 mb-1.5">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              data-ocid="shop.filter.tab"
+              onClick={() => handlePillClick(c.key)}
+              className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border-2 transition-all ${
+                activePill === c.key
+                  ? "bg-green-700 text-white border-green-700 shadow-sm"
+                  : "bg-white text-green-800 border-green-300"
+              }`}
+            >
+              {c.emoji} {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Category tiles */}
       <div className="px-3 mb-2">
@@ -730,34 +212,17 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
             <button
               key={cat.key}
               type="button"
-              onClick={() =>
-                setActiveCategory(cat.key === activeCategory ? "all" : cat.key)
-              }
-              className={`flex flex-col items-center shrink-0 rounded-xl overflow-hidden border-2 transition-all w-20 ${
-                activeCategory === cat.key
-                  ? "border-green-700 shadow-md scale-105"
-                  : "border-gray-200"
-              }`}
+              onClick={() => handlePillClick(cat.key)}
+              className="flex flex-col items-center shrink-0 rounded-xl overflow-hidden border border-gray-200 w-[72px] hover:border-green-500 transition-colors"
             >
-              <div className="relative w-full h-12 overflow-hidden">
+              <div className="w-full h-10 overflow-hidden">
                 <img
                   src={cat.img}
                   alt={cat.label}
                   className="w-full h-full object-cover"
                 />
-                {cat.badge && (
-                  <span className="absolute top-0.5 right-0.5 text-[7px] font-black px-1 rounded-full bg-red-500 text-white uppercase">
-                    {cat.badge}
-                  </span>
-                )}
               </div>
-              <span
-                className={`text-[9px] font-bold text-center leading-tight px-1 py-1 w-full ${
-                  activeCategory === cat.key
-                    ? "bg-green-700 text-white"
-                    : "bg-white text-gray-700"
-                }`}
-              >
+              <span className="text-[8px] font-bold text-center text-gray-700 px-1 py-0.5 leading-tight w-full bg-white">
                 {cat.label}
               </span>
             </button>
@@ -767,77 +232,67 @@ export default function ShopPage({ onOpenAdmin }: ShopPageProps) {
 
       {/* Products */}
       {isLoading ? (
-        <div className="px-3">
-          <div className="grid grid-cols-2 gap-3 pb-2">
-            {[1, 2, 3, 4].map((k) => (
-              <Skeleton key={k} className="w-full h-64 rounded-xl" />
-            ))}
-          </div>
+        <div className="px-3 flex flex-col gap-3">
+          {[1, 2].map((k) => (
+            <div key={k}>
+              <Skeleton className="h-4 w-32 mb-1.5 rounded" />
+              <div className="flex gap-2">
+                {[1, 2, 3].map((j) => (
+                  <Skeleton
+                    key={j}
+                    className="rounded-xl"
+                    style={{ width: "calc(33vw - 10px)", height: 165 }}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : productRows.length === 0 ? (
         <div
           data-ocid="shop.empty_state"
           className="flex flex-col items-center justify-center py-16 gap-3"
         >
           <span className="text-5xl">🥦</span>
           <p className="text-sm text-muted-foreground">
-            {search ? "No products found" : "No products available"}
+            {search ? "No products found" : "No products available yet"}
           </p>
+          {!search && (
+            <p className="text-xs text-gray-400 text-center px-8">
+              The admin is adding fresh products. Check back soon!
+            </p>
+          )}
         </div>
       ) : (
-        <div className="px-3 flex flex-col gap-1.5">
+        <div className="px-3 flex flex-col gap-2">
           {productRows.map((row, idx) => {
-            // Assign ref based on the first occurrence of each category key
             const isFirstOfKey =
               idx ===
               productRows.findIndex((r) => r.categoryKey === row.categoryKey);
-            const ref = isFirstOfKey
-              ? categoryRefs[row.categoryKey]
-              : undefined;
-
+            const ref = isFirstOfKey ? refs[row.categoryKey] : undefined;
             return (
               <div key={`${row.label}-${idx}`} ref={ref}>
-                {/* Section title with See All */}
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="font-bold text-gray-800 text-sm">
+                  <h2 className="font-display font-bold text-gray-800 text-sm">
                     {row.label}
                   </h2>
                   <button
                     type="button"
-                    className="flex items-center gap-0.5 text-green-700 text-[11px] font-bold"
+                    className="flex items-center gap-0.5 text-green-700 text-[10px] font-bold"
                   >
-                    See All
-                    <ChevronRight className="w-3 h-3" />
+                    See All <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
-
                 {row.isFirst ? (
-                  <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-                    {row.products.map((product: Product) => (
-                      <ProductCard
-                        key={product.id.toString()}
-                        product={product}
-                        tiny
-                      />
-                    ))}
-                  </div>
-                ) : row.isSecond ? (
-                  <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-                    {row.products.map((product: Product) => (
-                      <HorizontalProductCard
-                        key={product.id.toString()}
-                        product={product}
-                      />
+                  <div className="flex overflow-x-auto gap-2 pb-1.5 scrollbar-hide">
+                    {row.products.map((p: Product) => (
+                      <ProductCardCompact key={p.id.toString()} product={p} />
                     ))}
                   </div>
                 ) : (
-                  <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide">
-                    {row.products.map((product: Product) => (
-                      <ProductCard
-                        key={product.id.toString()}
-                        product={product}
-                        compact
-                      />
+                  <div className="flex overflow-x-auto gap-2 pb-1.5 scrollbar-hide">
+                    {row.products.map((p: Product) => (
+                      <ProductCardWide key={p.id.toString()} product={p} />
                     ))}
                   </div>
                 )}

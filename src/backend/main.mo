@@ -1,94 +1,53 @@
 import Map "mo:core/Map";
 import AccessControl "authorization/access-control";
-import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
-import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 
-
-
 actor {
-  type OldUnitType = { #kg; #piece; #bundle; #packet };
 
-  type StoreProduct = {
-    id : Nat;
-    name : Text;
-    unitType : OldUnitType;
-    pricePerUnit : Nat;
-    stock : Nat;
-    imageId : Text;
-  };
+  // ── Legacy type stubs (kept solely for stable-variable upgrade compatibility) ──
+  type OldUnitType         = { #kg; #piece; #bundle; #packet };
+  type LegacyStoreProduct  = { id : Nat; name : Text; unitType : OldUnitType; pricePerUnit : Nat; stock : Nat; imageId : Text };
+  type LegacyOrderItem1    = { productId : Nat; productName : Text; quantityLabel : Text; unitPrice : Nat; itemTotal : Nat };
+  type LegacyCustomerOrder = { id : Nat; customerName : Text; phone : Text; address : Text; items : [LegacyOrderItem1]; subtotal : Nat; discountAmount : Nat; totalAmount : Nat; paymentMethod : Text; status : Text; createdAt : Int };
+  type LegacyFeedback      = { id : Nat; customerName : Text; message : Text; createdAt : Int };
+  type LegacyProductV2     = { id : Nat; name : Text; price : Nat; stock : Nat; imageId : Text; category : Text };
+  type LegacyOrderItemV2   = { productId : Nat; productName : Text; quantity : Nat; price : Nat };
+  type LegacyOrderV2       = { id : Nat; customerName : Text; customerPhone : Text; customerAddress : Text; paymentMethod : Text; items : [LegacyOrderItemV2]; totalAmount : Nat; status : Text; createdAt : Int };
+  type LegacyProductNew    = { id : Nat; name : Text; price : Nat; stock : Nat; imageId : Text; unitType : Text; productCategory : Text; description : Text };
+  type LegacyOrderItemNew  = { productId : Nat; productName : Text; quantityLabel : Text; unitPrice : Nat; itemTotal : Nat };
+  type LegacyOrderNew      = { id : Nat; customerName : Text; customerPhone : Text; customerAddress : Text; paymentMethod : Text; items : [LegacyOrderItemNew]; subtotal : Nat; discountAmount : Nat; totalAmount : Nat; status : Text; createdAt : Int };
+  type LegacyProfile       = { phone : Text; name : Text; address : Text; updatedAt : Int };
+  type LegacyUserProfile   = { name : Text; phone : Text; address : Text };
 
-  type LegacyOrderItem1 = {
-    productId : Nat;
-    productName : Text;
-    quantityLabel : Text;
-    unitPrice : Nat;
-    itemTotal : Nat;
-  };
+  // ── Legacy stable bindings — names must match previous actor exactly ──────────
+  // accessControlState was created by AccessControl.initState() in old actor
+  let accessControlState = AccessControl.initState();
 
-  type CustomerOrder = {
-    id : Nat;
-    customerName : Text;
-    phone : Text;
-    address : Text;
-    items : [LegacyOrderItem1];
-    subtotal : Nat;
-    discountAmount : Nat;
-    totalAmount : Nat;
-    paymentMethod : Text;
-    status : Text;
-    createdAt : Int;
-  };
+  // Old plain stable vars
+  stable var discountPercentage  : Nat  = 0;
+  stable var discountMinimum     : Nat  = 0;
+  stable var discount            : Text = "";
+  stable var nextFeedbackId      : Nat  = 1;
+  stable var discountText        : Text = "";
+  stable var bannerEnabled       : Bool = true;
+  stable var trustBadgesEnabled  : Bool = true;
+  stable var bannerCustomText    : Text = "Fresh Vegetables Daily";
+  stable var minimumOrder        : Nat  = 0;
 
-  type OldFeedback = {
-    id : Nat;
-    customerName : Text;
-    message : Text;
-    createdAt : Int;
-  };
+  // Old Map-based stores (names must match exactly)
+  let storeProducts  = Map.empty<Nat, LegacyStoreProduct>();
+  let customerOrders = Map.empty<Nat, LegacyCustomerOrder>();
+  let feedbacks      = Map.empty<Nat, LegacyFeedback>();
+  let products       = Map.empty<Nat, LegacyProductV2>();
+  let orders         = Map.empty<Nat, LegacyOrderV2>();
+  let productsNew    = Map.empty<Nat, LegacyProductNew>();
+  let ordersNew      = Map.empty<Nat, LegacyOrderNew>();
+  let profiles       = Map.empty<Text, LegacyProfile>();
+  let userProfiles   = Map.empty<Principal, LegacyUserProfile>();
 
-  let storeProducts = Map.empty<Nat, StoreProduct>();
-  let customerOrders = Map.empty<Nat, CustomerOrder>();
-  let feedbacks = Map.empty<Nat, OldFeedback>();
-
-  stable var discountPercentage : Nat = 0;
-  stable var discountMinimum : Nat = 0;
-  stable var discount : Text = "";
-  stable var nextFeedbackId : Nat = 1;
-
-  type ProductV2 = {
-    id : Nat;
-    name : Text;
-    price : Nat;
-    stock : Nat;
-    imageId : Text;
-    category : Text;
-  };
-
-  type OrderItemV2 = {
-    productId : Nat;
-    productName : Text;
-    quantity : Nat;
-    price : Nat;
-  };
-
-  type OrderV2 = {
-    id : Nat;
-    customerName : Text;
-    customerPhone : Text;
-    customerAddress : Text;
-    paymentMethod : Text;
-    items : [OrderItemV2];
-    totalAmount : Nat;
-    status : Text;
-    createdAt : Int;
-  };
-
-  let products = Map.empty<Nat, ProductV2>();
-  let orders = Map.empty<Nat, OrderV2>();
-
+  // ── Current types ───────────────────────────────────────────────────────
   type Product = {
     id : Nat;
     name : Text;
@@ -117,6 +76,8 @@ actor {
     items : [OrderItem];
     subtotal : Nat;
     discountAmount : Nat;
+    discountType : Text;
+    freeItem : Text;
     totalAmount : Nat;
     status : Text;
     createdAt : Int;
@@ -129,46 +90,41 @@ actor {
     updatedAt : Int;
   };
 
-  public type UserProfile = {
-    name : Text;
-    phone : Text;
-    address : Text;
+  type DiscountSettings = {
+    percentageOff : Nat;
+    percentageMinOrder : Nat;
+    flatOff : Nat;
+    flatMinOrder : Nat;
+    freeItemName : Text;
+    freeItemMinOrder : Nat;
   };
 
-  stable var nextProductId : Nat = 1;
-  stable var nextOrderId : Nat = 1;
+  type AppSettings = {
+    heroBannerEnabled : Bool;
+    heroBannerHeadline : Text;
+  };
+
+  // ── Current stable state ────────────────────────────────────────────────
+  stable var nextProductId : Nat  = 1;
+  stable var nextOrderId   : Nat  = 1;
   stable var deliveryTiming : Text = "10am - 6pm";
-  stable var discountText : Text = "";
+  stable var heroBannerEnabled  : Bool = true;
+  stable var heroBannerHeadline : Text = "Fresh Vegetables Daily";
 
-  // Premium UI controls
-  stable var bannerEnabled : Bool = true;
-  stable var trustBadgesEnabled : Bool = true;
-  stable var bannerCustomText : Text = "Fresh Vegetables Daily";
+  stable var discountPercentageOff      : Nat  = 0;
+  stable var discountPercentageMinOrder : Nat  = 0;
+  stable var discountFlatOff            : Nat  = 0;
+  stable var discountFlatMinOrder       : Nat  = 0;
+  stable var discountFreeItemName       : Text = "";
+  stable var discountFreeItemMinOrder   : Nat  = 0;
 
-  // Minimum order amount (0 = no minimum)
-  stable var minimumOrder : Nat = 0;
+  let productsMap = Map.empty<Nat, Product>();
+  let ordersMap   = Map.empty<Nat, Order>();
+  let profilesMap = Map.empty<Text, CustomerProfile>();
 
-  let productsNew = Map.empty<Nat, Product>();
-  let ordersNew = Map.empty<Nat, Order>();
-  let profiles = Map.empty<Text, CustomerProfile>();
-
-  let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
   include MixinStorage();
 
-  let userProfiles = Map.empty<Principal, UserProfile>();
-
-  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    userProfiles.get(caller);
-  };
-
-  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    userProfiles.get(user);
-  };
-
-  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    userProfiles.add(caller, profile);
-  };
+  // ── Products ──────────────────────────────────────────────────────────
 
   public shared func addProduct(
     name : Text,
@@ -180,20 +136,13 @@ actor {
     description : Text,
   ) : async Nat {
     let id = nextProductId;
-    productsNew.add(id, { id; name; price; stock; imageId; unitType; productCategory; description });
+    productsMap.add(id, { id; name; price; stock; imageId; unitType; productCategory; description });
     nextProductId += 1;
     id;
   };
 
   public query func getProducts() : async [Product] {
-    productsNew.values().toArray();
-  };
-
-  public query func getProduct(id : Nat) : async Product {
-    switch (productsNew.get(id)) {
-      case (?p) { p };
-      case (null) { Runtime.trap("Product not found") };
-    };
+    productsMap.values().toArray();
   };
 
   public shared func updateProduct(
@@ -205,20 +154,28 @@ actor {
     unitType : Text,
     productCategory : Text,
     description : Text,
-  ) : async () {
-    switch (productsNew.get(id)) {
-      case (null) { Runtime.trap("Product not found") };
+  ) : async Bool {
+    switch (productsMap.get(id)) {
+      case (null) { false };
       case (?_) {
-        productsNew.add(id, { id; name; price; stock; imageId; unitType; productCategory; description });
+        productsMap.add(id, { id; name; price; stock; imageId; unitType; productCategory; description });
+        true;
       };
     };
   };
 
-  public shared func deleteProduct(id : Nat) : async () {
-    productsNew.remove(id);
+  public shared func deleteProduct(id : Nat) : async Bool {
+    switch (productsMap.get(id)) {
+      case (null) { false };
+      case (?_) {
+        productsMap.remove(id);
+        true;
+      };
+    };
   };
 
-  // placeOrder is open to all anonymous customers - no login required
+  // ── Orders ────────────────────────────────────────────────────────────
+
   public shared func placeOrder(
     customerName : Text,
     customerPhone : Text,
@@ -227,10 +184,12 @@ actor {
     items : [OrderItem],
     subtotal : Nat,
     discountAmount : Nat,
+    discountType : Text,
+    freeItem : Text,
     totalAmount : Nat,
   ) : async Nat {
     let id = nextOrderId;
-    ordersNew.add(
+    ordersMap.add(
       id,
       {
         id;
@@ -241,8 +200,10 @@ actor {
         items;
         subtotal;
         discountAmount;
+        discountType;
+        freeItem;
         totalAmount;
-        status = "Processing";
+        status    = "Processing";
         createdAt = Time.now();
       },
     );
@@ -251,98 +212,113 @@ actor {
   };
 
   public query func getOrders() : async [Order] {
-    ordersNew.values().toArray();
+    ordersMap.values().toArray();
   };
 
-  // getOrdersByPhone open to all - customers look up by their own phone number
   public query func getOrdersByPhone(phone : Text) : async [Order] {
-    ordersNew.values().filter(func(o : Order) : Bool { o.customerPhone == phone }).toArray();
+    ordersMap.values().filter(func(o : Order) : Bool { o.customerPhone == phone }).toArray();
   };
 
-  public shared func updateOrderStatus(id : Nat, status : Text) : async () {
-    switch (ordersNew.get(id)) {
-      case (null) { Runtime.trap("Order not found") };
+  public shared func updateOrderStatus(id : Nat, status : Text) : async Bool {
+    switch (ordersMap.get(id)) {
+      case (null) { false };
       case (?o) {
-        ordersNew.add(
-          id,
-          {
-            id = o.id;
-            customerName = o.customerName;
-            customerPhone = o.customerPhone;
-            customerAddress = o.customerAddress;
-            paymentMethod = o.paymentMethod;
-            items = o.items;
-            subtotal = o.subtotal;
-            discountAmount = o.discountAmount;
-            totalAmount = o.totalAmount;
-            status;
-            createdAt = o.createdAt;
-          },
-        );
+        ordersMap.add(id, {
+          id              = o.id;
+          customerName    = o.customerName;
+          customerPhone   = o.customerPhone;
+          customerAddress = o.customerAddress;
+          paymentMethod   = o.paymentMethod;
+          items           = o.items;
+          subtotal        = o.subtotal;
+          discountAmount  = o.discountAmount;
+          discountType    = o.discountType;
+          freeItem        = o.freeItem;
+          totalAmount     = o.totalAmount;
+          status;
+          createdAt       = o.createdAt;
+        });
+        true;
       };
     };
   };
 
-  public shared func deleteOrder(id : Nat) : async () {
-    ordersNew.remove(id);
+  public shared func deleteOrder(id : Nat) : async Bool {
+    switch (ordersMap.get(id)) {
+      case (null) { false };
+      case (?_) {
+        ordersMap.remove(id);
+        true;
+      };
+    };
   };
 
-  // saveProfile open to all anonymous customers - no login required
-  public shared func saveProfile(name : Text, phone : Text, address : Text) : async () {
-    profiles.add(phone, { phone; name; address; updatedAt = Time.now() });
+  // ── Profiles ────────────────────────────────────────────────────────────
+
+  public shared func saveProfile(phone : Text, name : Text, address : Text) : async Bool {
+    profilesMap.add(phone, { phone; name; address; updatedAt = Time.now() });
+    true;
   };
 
-  public query func getProfiles() : async [CustomerProfile] {
-    profiles.values().toArray();
+  public query func getProfile(phone : Text) : async ?CustomerProfile {
+    profilesMap.get(phone);
   };
+
+  public query func getAllProfiles() : async [CustomerProfile] {
+    profilesMap.values().toArray();
+  };
+
+  // ── Delivery Timing ────────────────────────────────────────────────────
 
   public query func getDeliveryTiming() : async Text {
     deliveryTiming;
   };
 
-  public shared func setDeliveryTiming(timing : Text) : async () {
+  public shared func setDeliveryTiming(timing : Text) : async Bool {
     deliveryTiming := timing;
+    true;
   };
 
-  public query func getDiscount() : async Text {
-    discountText;
+  // ── Discount Settings ──────────────────────────────────────────────────
+
+  public query func getDiscountSettings() : async DiscountSettings {
+    {
+      percentageOff      = discountPercentageOff;
+      percentageMinOrder = discountPercentageMinOrder;
+      flatOff            = discountFlatOff;
+      flatMinOrder       = discountFlatMinOrder;
+      freeItemName       = discountFreeItemName;
+      freeItemMinOrder   = discountFreeItemMinOrder;
+    };
   };
 
-  public shared func setDiscount(text : Text) : async () {
-    discountText := text;
+  public shared func setDiscountSettings(
+    percentageOff      : Nat,
+    percentageMinOrder : Nat,
+    flatOff            : Nat,
+    flatMinOrder       : Nat,
+    freeItemName       : Text,
+    freeItemMinOrder   : Nat,
+  ) : async Bool {
+    discountPercentageOff      := percentageOff;
+    discountPercentageMinOrder := percentageMinOrder;
+    discountFlatOff            := flatOff;
+    discountFlatMinOrder       := flatMinOrder;
+    discountFreeItemName       := freeItemName;
+    discountFreeItemMinOrder   := freeItemMinOrder;
+    true;
   };
 
-  // Premium UI controls
-  public query func getBannerEnabled() : async Bool {
-    bannerEnabled;
+  // ── App Settings ─────────────────────────────────────────────────────────
+
+  public query func getAppSettings() : async AppSettings {
+    { heroBannerEnabled; heroBannerHeadline };
   };
 
-  public shared func setBannerEnabled(enabled : Bool) : async () {
-    bannerEnabled := enabled;
+  public shared func setAppSettings(enabled : Bool, headline : Text) : async Bool {
+    heroBannerEnabled  := enabled;
+    heroBannerHeadline := headline;
+    true;
   };
 
-  public query func getTrustBadgesEnabled() : async Bool {
-    trustBadgesEnabled;
-  };
-
-  public shared func setTrustBadgesEnabled(enabled : Bool) : async () {
-    trustBadgesEnabled := enabled;
-  };
-
-  public query func getBannerText() : async Text {
-    bannerCustomText;
-  };
-
-  public shared func setBannerText(text : Text) : async () {
-    bannerCustomText := text;
-  };
-
-  // Minimum order amount
-  public query func getMinimumOrder() : async Nat {
-    minimumOrder;
-  };
-
-  public shared func setMinimumOrder(amount : Nat) : async () {
-    minimumOrder := amount;
-  };
 };

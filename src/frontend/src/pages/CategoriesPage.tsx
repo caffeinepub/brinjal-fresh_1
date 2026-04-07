@@ -1,235 +1,154 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { Search } from "lucide-react";
+import { useState } from "react";
 import type { Product } from "../backend";
-import {
-  getOptionPrice,
-  getQuantityOptions,
-  getUnitLabel,
-  useKart,
-} from "../context/KartContext";
+import { ProductCardWide } from "../components/ProductCard";
 import { useProducts } from "../hooks/useQueries";
-import { useStorageClient } from "../hooks/useStorageClient";
 
 const CATEGORIES = [
   {
+    key: "vegetables",
     label: "Vegetables",
+    emoji: "🥦",
     img: "/assets/generated/category-vegetables.dim_300x200.jpg",
-    color: "#e8f5e9",
-    border: "#4caf50",
-    key: "Vegetables",
+    desc: "Fresh seasonal vegetables",
   },
   {
+    key: "fruits",
     label: "Fruits",
+    emoji: "🍎",
     img: "/assets/generated/category-fruits.dim_300x200.jpg",
-    color: "#fff3e0",
-    border: "#f97316",
-    key: "Fruits",
+    desc: "Sweet and nutritious fruits",
   },
   {
+    key: "leafy",
     label: "Leafy Vegetables",
+    emoji: "🌿",
     img: "/assets/generated/category-leafy.dim_300x200.jpg",
-    color: "#f1f8e9",
-    border: "#8bc34a",
-    key: "Leafy Vegetables",
+    desc: "Spinach, methi, coriander & more",
   },
   {
+    key: "roots",
     label: "Root Vegetables",
+    emoji: "🥕",
     img: "/assets/generated/category-roots.dim_300x200.jpg",
-    color: "#fbe9e7",
-    border: "#795548",
-    key: "Root Vegetables",
+    desc: "Carrots, radish, beetroot & more",
   },
   {
+    key: "combo",
     label: "Combo Pack",
+    emoji: "📦",
     img: "/assets/generated/category-combo.dim_300x200.jpg",
-    color: "#ede7f6",
-    border: "#7c3aed",
-    key: "Combo Pack",
-    badge: "Hot",
+    desc: "Best value combo bundles",
   },
 ];
 
-function ProductImage({ imageId }: { imageId: string }) {
-  const storageClient = useStorageClient();
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!imageId || !storageClient) return;
-    storageClient
-      .getDirectURL(imageId)
-      .then(setUrl)
-      .catch(() => setUrl(null));
-  }, [imageId, storageClient]);
-
-  if (!imageId || !url) {
-    return (
-      <div className="w-full aspect-square bg-green-50 flex items-center justify-center">
-        <span className="text-3xl">🥦</span>
-      </div>
-    );
-  }
-  return (
-    <div className="w-full aspect-square bg-secondary overflow-hidden">
-      <img src={url} alt="product" className="w-full h-full object-cover" />
-    </div>
-  );
-}
-
-function ProductCard({ product }: { product: Product }) {
-  const { addToKart } = useKart();
-  const unitType = product.unitType || "kg";
-  const options = getQuantityOptions(unitType);
-  const [selectedOption, setSelectedOption] = useState(options[0]);
-
-  const basePrice = Number(product.price);
-  const unitLabel = getUnitLabel(unitType);
-  const calculatedPrice = Number(getOptionPrice(product.price, selectedOption));
-  const inStock = Number(product.stock) > 0;
-
-  const handleAdd = () => {
-    if (!inStock) return;
-    addToKart(product, selectedOption);
-    toast.success(`${product.name} added to kart!`);
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col border border-gray-100">
-      <div className="relative">
-        <ProductImage imageId={product.imageId} />
-        {!inStock && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold bg-red-500 px-2 py-0.5 rounded">
-              Out of Stock
-            </span>
-          </div>
-        )}
-        {inStock && (
-          <span className="absolute top-1 left-1 bg-green-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">
-            FRESH
-          </span>
-        )}
-      </div>
-      <div className="p-2 flex flex-col gap-1 flex-1">
-        <h3 className="font-bold text-gray-800 text-xs leading-tight line-clamp-2">
-          {product.name}
-        </h3>
-        {product.description && (
-          <p className="text-[9px] text-gray-500 italic line-clamp-1">
-            {product.description}
-          </p>
-        )}
-        {/* Attractive price block */}
-        <div className="bg-green-50 rounded-lg px-2 py-1 flex items-baseline gap-1">
-          <span className="text-green-800 font-black text-base leading-none">
-            ₹{basePrice}
-          </span>
-          <span className="text-gray-500 font-bold text-[9px]">
-            {unitLabel}
-          </span>
-        </div>
-        <div className="flex gap-1">
-          {options.slice(0, 3).map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => setSelectedOption(opt)}
-              className={`flex-1 text-[9px] font-bold py-1 rounded-md border transition-colors ${
-                selectedOption === opt
-                  ? "bg-green-700 text-white border-green-700"
-                  : "bg-white text-gray-600 border-gray-300"
-              }`}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-        <p className="text-orange-600 font-extrabold text-sm text-center leading-none">
-          ₹{calculatedPrice}
-        </p>
-        <button
-          type="button"
-          data-ocid="categories.product.button"
-          onClick={handleAdd}
-          disabled={!inStock}
-          className="w-full py-1.5 rounded-lg text-[11px] font-bold text-white transition-colors disabled:opacity-50"
-          style={{ backgroundColor: inStock ? "#1a5c2a" : "#9ca3af" }}
-        >
-          + Add
-        </button>
-      </div>
-    </div>
-  );
+function getCategoryKey(productCategory: string): string {
+  const cat = (productCategory || "").toLowerCase();
+  if (cat.includes("fruit")) return "fruits";
+  if (cat.includes("leafy")) return "leafy";
+  if (cat.includes("root")) return "roots";
+  if (cat.includes("combo")) return "combo";
+  return "vegetables";
 }
 
 export default function CategoriesPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { data: products, isLoading } = useProducts();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  const categoryInfo = CATEGORIES.find((c) => c.key === selectedCategory);
+  const categoryCounts = CATEGORIES.map((c) => ({
+    ...c,
+    count: (products ?? []).filter(
+      (p: Product) => getCategoryKey(p.productCategory) === c.key,
+    ).length,
+  }));
 
-  const filteredProducts = selectedCategory
-    ? (products ?? []).filter((p: Product) => {
-        const cat = p.productCategory || "";
-        return cat.toLowerCase() === selectedCategory.toLowerCase();
-      })
-    : [];
+  if (selectedCategory !== null) {
+    const cat = CATEGORIES.find((c) => c.key === selectedCategory);
+    const filtered = (products ?? []).filter(
+      (p: Product) =>
+        getCategoryKey(p.productCategory) === selectedCategory &&
+        (p.name || "").toLowerCase().includes(search.toLowerCase()),
+    );
 
-  if (selectedCategory && categoryInfo) {
     return (
-      <div className="pb-4">
+      <div className="pb-2">
+        {/* Category header */}
         <div
-          className="sticky top-0 z-10 flex items-center gap-3 px-3 py-3 border-b border-gray-100"
-          style={{ backgroundColor: categoryInfo.color }}
+          className="relative h-28 overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, #14532d 0%, #16a34a 100%)",
+          }}
         >
-          <button
-            type="button"
-            data-ocid="categories.back.button"
-            onClick={() => setSelectedCategory(null)}
-            className="flex items-center gap-1.5 text-gray-700"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
           <img
-            src={categoryInfo.img}
-            alt={categoryInfo.label}
-            className="w-8 h-8 rounded-full object-cover border-2"
-            style={{ borderColor: categoryInfo.border }}
+            src={cat?.img}
+            alt={cat?.label}
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
           />
-          <h2 className="font-display font-bold text-gray-800 text-base">
-            {categoryInfo.label}
-          </h2>
+          <div className="relative z-10 flex items-center gap-3 px-4 h-full">
+            <button
+              type="button"
+              data-ocid="categories.back.button"
+              onClick={() => {
+                setSelectedCategory(null);
+                setSearch("");
+              }}
+              className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold text-lg"
+            >
+              ‹
+            </button>
+            <div>
+              <h1 className="text-white font-display font-bold text-xl">
+                {cat?.emoji} {cat?.label}
+              </h1>
+              <p className="text-white/80 text-xs">
+                {filtered.length} products
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="px-3 py-3">
+        {/* Search */}
+        <div className="px-3 py-2">
+          <div
+            className="flex items-center gap-2 bg-white rounded-xl px-3 border border-gray-200 shadow-xs"
+            style={{ height: 36 }}
+          >
+            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <input
+              data-ocid="categories.search_input"
+              type="text"
+              placeholder={`Search in ${cat?.label}...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
+            />
+          </div>
+        </div>
+
+        {/* Products */}
+        <div className="px-3">
           {isLoading ? (
-            <div
-              data-ocid="categories.loading_state"
-              className="grid grid-cols-2 gap-3"
-            >
+            <div className="grid grid-cols-2 gap-3">
               {[1, 2, 3, 4].map((k) => (
-                <Skeleton key={k} className="h-52 rounded-xl" />
+                <Skeleton key={k} className="h-52 rounded-2xl" />
               ))}
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div
               data-ocid="categories.empty_state"
-              className="flex flex-col items-center justify-center py-16 gap-3"
+              className="flex flex-col items-center py-16 gap-3"
             >
-              <img
-                src={categoryInfo.img}
-                alt={categoryInfo.label}
-                className="w-24 h-24 rounded-full object-cover opacity-40"
-              />
+              <span className="text-5xl">{cat?.emoji}</span>
               <p className="text-sm text-muted-foreground">
-                No products in {categoryInfo.label} yet
+                No products in this category yet
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {filteredProducts.map((product: Product) => (
-                <ProductCard key={product.id.toString()} product={product} />
+            <div className="flex flex-wrap gap-3">
+              {filtered.map((p: Product) => (
+                <ProductCardWide key={p.id.toString()} product={p} />
               ))}
             </div>
           )}
@@ -239,37 +158,58 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="px-3 py-4">
-      <h2 className="font-display font-bold text-gray-800 text-lg mb-4">
-        Categories
-      </h2>
-      <div className="grid grid-cols-2 gap-3">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.key}
-            type="button"
-            data-ocid={`categories.${cat.key.toLowerCase().replace(/ /g, "_")}.button`}
-            onClick={() => setSelectedCategory(cat.key)}
-            className="relative rounded-2xl overflow-hidden border-2 transition-all active:scale-95 h-28"
-            style={{ borderColor: cat.border }}
-          >
-            <img
-              src={cat.img}
-              alt={cat.label}
-              className="w-full h-full object-cover"
-            />
-            {/* Dark overlay for text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            {cat.badge && (
-              <span className="absolute top-2 right-2 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-red-500 text-white uppercase">
-                {cat.badge}
-              </span>
-            )}
-            <span className="absolute bottom-2 left-0 right-0 text-center font-display font-bold text-white text-sm drop-shadow">
-              {cat.label}
-            </span>
-          </button>
-        ))}
+    <div className="pb-2">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-2">
+        <h1 className="font-display font-bold text-gray-900 text-xl">
+          Categories
+        </h1>
+        <p className="text-xs text-gray-500 mt-0.5">Browse by category</p>
+      </div>
+
+      {/* Category grid */}
+      <div className="px-3">
+        <div className="grid grid-cols-2 gap-3">
+          {categoryCounts.map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              data-ocid="categories.item.1"
+              onClick={() => setSelectedCategory(cat.key)}
+              className="relative rounded-2xl overflow-hidden border border-gray-100 shadow-card text-left hover:shadow-card-lg transition-shadow"
+            >
+              <div className="h-28 overflow-hidden relative">
+                <img
+                  src={cat.img}
+                  alt={cat.label}
+                  className="w-full h-full object-cover"
+                />
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)",
+                  }}
+                />
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-3">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <span className="text-white font-display font-bold text-sm drop-shadow">
+                      {cat.emoji} {cat.label}
+                    </span>
+                    <p className="text-white/80 text-[9px] mt-0.5">
+                      {cat.desc}
+                    </p>
+                  </div>
+                  <span className="bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {cat.count}
+                  </span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
