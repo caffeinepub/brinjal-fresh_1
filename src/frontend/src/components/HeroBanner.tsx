@@ -3,36 +3,44 @@ import {
   parseDiscount,
   useDeliveryTiming,
   useDiscount,
+  useGetCustomSlides,
 } from "../hooks/useQueries";
 
 interface HeroBannerProps {
   bannerHeadline: string;
 }
 
+interface Slide {
+  emoji: string;
+  headline: string;
+  sub: string;
+  tint: string;
+}
+
+const SLIDE_INTERVAL = 3000;
+
 export function HeroBanner({ bannerHeadline }: HeroBannerProps) {
-  const [slide, setSlide] = useState(0);
+  const [current, setCurrent] = useState(0);
+  const [fading, setFading] = useState(false);
+
   const { data: deliveryTiming } = useDeliveryTiming();
   const { data: discountRaw } = useDiscount();
-  const discount = parseDiscount(discountRaw ?? "");
+  const { data: customSlidesRaw } = useGetCustomSlides();
+  const discount = parseDiscount(discountRaw ?? null);
 
-  const slides = useMemo(() => {
-    const list: Array<{
-      emoji: string;
-      headline: string;
-      sub: string;
-      bg: string;
-    }> = [
+  const slides = useMemo<Slide[]>(() => {
+    const list: Slide[] = [
       {
         emoji: "🛒",
-        headline: "Minimum order up to ₹99",
-        sub: "Order worth ₹99 or more to checkout",
-        bg: "linear-gradient(135deg, #78350f 0%, #b45309 100%)",
+        headline: "Minimum Order ₹99",
+        sub: "Place orders above ₹99 to checkout",
+        tint: "linear-gradient(120deg, rgba(180,83,9,0.82) 0%, rgba(120,53,15,0.65) 60%, rgba(0,0,0,0.25) 100%)",
       },
       {
         emoji: "🚚",
-        headline: "Free Delivery on Every Order",
-        sub: "No extra charges, ever!",
-        bg: "linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)",
+        headline: "Free Delivery",
+        sub: "On every order, always",
+        tint: "linear-gradient(120deg, rgba(21,128,61,0.82) 0%, rgba(13,74,26,0.65) 60%, rgba(0,0,0,0.25) 100%)",
       },
     ];
 
@@ -40,8 +48,8 @@ export function HeroBanner({ bannerHeadline }: HeroBannerProps) {
       list.push({
         emoji: "⏰",
         headline: deliveryTiming,
-        sub: "Today's delivery schedule",
-        bg: "linear-gradient(135deg, #0d4a1a 0%, #15803d 100%)",
+        sub: "Fresh to your doorstep",
+        tint: "linear-gradient(120deg, rgba(29,78,216,0.82) 0%, rgba(30,58,138,0.65) 60%, rgba(0,0,0,0.25) 100%)",
       });
     }
 
@@ -53,93 +61,180 @@ export function HeroBanner({ bannerHeadline }: HeroBannerProps) {
         if (discount.freeItem && discount.freeItemMinimum > 0) {
           headline = `FREE ${discount.freeItem} on orders above ₹${discount.freeItemMinimum}`;
         } else if (discount.percentage > 0) {
-          headline = `${discount.percentage}% OFF on orders above ₹${discount.minimumAmount}`;
+          headline = `${discount.percentage}% OFF above ₹${discount.minimumAmount}`;
         } else if (discount.flatAmount > 0) {
-          headline = `₹${discount.flatAmount} OFF on orders above ₹${discount.flatMinimum}`;
+          headline = `₹${discount.flatAmount} OFF above ₹${discount.flatMinimum}`;
         }
         list.push({
           emoji: "🎉",
           headline,
           sub: "Special offer just for you!",
-          bg: "linear-gradient(135deg, #581c87 0%, #7c3aed 100%)",
+          tint: "linear-gradient(120deg, rgba(109,40,217,0.82) 0%, rgba(76,29,149,0.65) 60%, rgba(0,0,0,0.25) 100%)",
         });
       }
     }
 
-    list.push({
-      emoji: "🥦",
-      headline: bannerHeadline || "Fresh Vegetables Daily",
-      sub: "Farm fresh to your door",
-      bg: "linear-gradient(135deg, #14532d 0%, #16a34a 100%)",
-    });
+    if (customSlidesRaw && customSlidesRaw.length > 0) {
+      for (const [, text] of customSlidesRaw) {
+        list.push({
+          emoji: "🥬",
+          headline: text,
+          sub: "Brinjal Fresh Store",
+          tint: "linear-gradient(120deg, rgba(15,118,110,0.82) 0%, rgba(19,78,74,0.65) 60%, rgba(0,0,0,0.25) 100%)",
+        });
+      }
+    }
 
     return list;
-  }, [deliveryTiming, discount, bannerHeadline]);
+  }, [deliveryTiming, discount, bannerHeadline, customSlidesRaw]);
+
+  const goTo = (idx: number) => {
+    if (idx === current) return;
+    setFading(true);
+    setTimeout(() => {
+      setCurrent(idx);
+      setFading(false);
+    }, 260);
+  };
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setSlide((prev) => (prev + 1) % slides.length);
-    }, 3000);
+    const advanceSlide = () => {
+      setFading(true);
+      setTimeout(() => {
+        setCurrent((prev) => (prev + 1) % slides.length);
+        setFading(false);
+      }, 260);
+    };
+    const timer = setInterval(advanceSlide, SLIDE_INTERVAL);
     return () => clearInterval(timer);
   }, [slides.length]);
 
-  const currentIdx = slide % slides.length;
-  const current = slides[currentIdx];
+  const activeIdx = current % slides.length;
+  const activeSlide = slides[activeIdx];
 
   return (
     <div
       data-ocid="shop.hero.panel"
-      className="mx-3 mb-2 rounded-2xl overflow-hidden shadow-card relative"
-      style={{ height: 100 }}
+      className="mx-3 mb-2 rounded-2xl overflow-hidden shadow-hero relative select-none"
+      style={{ height: 192 }}
     >
+      {/* Full-width background vegetable image */}
+      <img
+        src="/assets/generated/hero-vegetables-group.dim_600x200.jpg"
+        alt="Fresh Vegetables"
+        className="absolute inset-0 w-full h-full object-cover"
+        draggable={false}
+      />
+
+      {/* Base dark overlay for contrast */}
       <div
-        className="absolute inset-0 flex items-stretch transition-all duration-500"
-        style={{ background: current.bg }}
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.3) 55%, rgba(0,0,0,0.12) 100%)",
+        }}
+      />
+
+      {/* Colored tint overlay — changes per slide */}
+      <div
+        className="absolute inset-0 transition-slide"
+        style={{
+          background: activeSlide.tint,
+          opacity: fading ? 0 : 1,
+          transition: "opacity 0.28s ease-in-out",
+        }}
+      />
+
+      {/* Text content */}
+      <div
+        className="absolute inset-0 flex flex-col justify-center px-4 pb-6 pt-3"
+        style={{
+          opacity: fading ? 0 : 1,
+          transition: "opacity 0.22s ease-in-out",
+        }}
       >
-        {/* Left half: text */}
-        <div className="w-1/2 flex items-center gap-1.5 pl-3 pr-1">
-          <span className="text-xl shrink-0">{current.emoji}</span>
-          <div className="min-w-0">
-            <p className="text-white font-black text-xs leading-snug drop-shadow line-clamp-2">
-              {current.headline}
-            </p>
-            <p className="text-white/75 text-[9px] font-semibold mt-0.5">
-              {current.sub}
-            </p>
-          </div>
-        </div>
-        {/* Right half: vegetables image */}
-        <div className="w-1/2 relative overflow-hidden">
-          <img
-            src="/assets/generated/hero-vegetables-group.dim_600x200.jpg"
-            alt="Fresh Vegetables"
-            className="w-full h-full object-cover"
-          />
-          <div
-            className="absolute inset-0"
+        {/* Emoji badge */}
+        <span
+          className="text-2xl mb-1.5 leading-none drop-shadow-md"
+          aria-hidden="true"
+        >
+          {activeSlide.emoji}
+        </span>
+
+        {/* Headline */}
+        <h2
+          className="text-white font-extrabold leading-tight drop-shadow-md"
+          style={{
+            fontSize: "clamp(1rem, 4.5vw, 1.25rem)",
+            textShadow: "0 2px 8px rgba(0,0,0,0.55)",
+            maxWidth: "62%",
+          }}
+        >
+          {activeSlide.headline}
+        </h2>
+
+        {/* Sub-text */}
+        <p
+          className="font-semibold mt-1 drop-shadow"
+          style={{
+            fontSize: "clamp(0.68rem, 3vw, 0.8rem)",
+            color: "rgba(255,255,255,0.88)",
+            textShadow: "0 1px 4px rgba(0,0,0,0.45)",
+            maxWidth: "58%",
+          }}
+        >
+          {activeSlide.sub}
+        </p>
+
+        {/* Orange pill accent */}
+        <div className="mt-2.5">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-white font-bold text-[10px] shadow"
             style={{
-              background:
-                "linear-gradient(to right, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 70%, transparent 100%)",
+              background: "rgba(251,146,60,0.92)",
+              letterSpacing: "0.01em",
             }}
-          />
+          >
+            🛍️ Order Now
+          </span>
         </div>
       </div>
 
-      {/* Dots */}
-      <div className="absolute bottom-2 right-2 flex gap-1 z-10">
+      {/* Dot indicators */}
+      <div className="absolute bottom-2.5 left-4 flex gap-1.5 z-10">
         {slides.map((s, i) => (
           <button
-            key={s.headline}
+            key={`dot-${i}-${s.headline.slice(0, 8)}`}
             type="button"
             aria-label={`Slide ${i + 1}`}
-            onClick={() => setSlide(i)}
-            className={`rounded-full transition-all duration-300 ${
-              currentIdx === i
-                ? "w-3.5 h-1.5 bg-white"
-                : "w-1.5 h-1.5 bg-white/50"
-            }`}
+            onClick={() => goTo(i)}
+            className="rounded-full transition-all duration-300 focus:outline-none"
+            style={{
+              width: activeIdx === i ? 20 : 7,
+              height: 7,
+              background:
+                activeIdx === i
+                  ? "rgba(251,146,60,1)"
+                  : "rgba(255,255,255,0.55)",
+              boxShadow:
+                activeIdx === i ? "0 1px 4px rgba(0,0,0,0.35)" : "none",
+            }}
           />
         ))}
+      </div>
+
+      {/* Slide count badge (top-right) */}
+      <div className="absolute top-2.5 right-3 z-10">
+        <span
+          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+          style={{
+            background: "rgba(0,0,0,0.4)",
+            color: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          {activeIdx + 1}/{slides.length}
+        </span>
       </div>
     </div>
   );

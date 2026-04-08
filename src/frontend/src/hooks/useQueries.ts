@@ -1,9 +1,10 @@
+import { useActor } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Order, Product } from "../backend";
-import { useActor } from "./useActor";
+import type { DiscountSettings, Order, Product } from "../backend";
+import { createActor } from "../backend";
 
 export function useProducts() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: async () => {
@@ -17,7 +18,7 @@ export function useProducts() {
 }
 
 export function useDeliveryTiming() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<string>({
     queryKey: ["deliveryTiming"],
     queryFn: async () => {
@@ -31,12 +32,12 @@ export function useDeliveryTiming() {
 }
 
 export function useDiscount() {
-  const { actor, isFetching } = useActor();
-  return useQuery<string>({
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<DiscountSettings | null>({
     queryKey: ["discount"],
     queryFn: async () => {
-      if (!actor) return "";
-      return actor.getDiscount();
+      if (!actor) return null;
+      return actor.getDiscountSettings();
     },
     enabled: !!actor && !isFetching,
     refetchInterval: 30_000,
@@ -45,7 +46,7 @@ export function useDiscount() {
 }
 
 export function useOrders() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Order[]>({
     queryKey: ["orders"],
     queryFn: async () => {
@@ -58,7 +59,7 @@ export function useOrders() {
 }
 
 export function useOrdersByPhone(phone: string) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Order[]>({
     queryKey: ["ordersByPhone", phone],
     queryFn: async () => {
@@ -72,19 +73,19 @@ export function useOrdersByPhone(phone: string) {
 }
 
 export function useProfiles() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery({
     queryKey: ["profiles"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getProfiles();
+      return actor.getAllProfiles();
     },
     enabled: !!actor && !isFetching,
   });
 }
 
 export function usePlaceOrder() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -101,6 +102,8 @@ export function usePlaceOrder() {
       }>;
       subtotal: bigint;
       discountAmount: bigint;
+      discountType: string;
+      freeItem: string;
       totalAmount: bigint;
     }) => {
       if (!actor) throw new Error("Not connected");
@@ -112,6 +115,8 @@ export function usePlaceOrder() {
         params.items,
         params.subtotal,
         params.discountAmount,
+        params.discountType,
+        params.freeItem,
         params.totalAmount,
       );
     },
@@ -123,7 +128,7 @@ export function usePlaceOrder() {
 }
 
 export function useAddProduct() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -153,7 +158,7 @@ export function useAddProduct() {
 }
 
 export function useUpdateProduct() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -185,7 +190,7 @@ export function useUpdateProduct() {
 }
 
 export function useDeleteProduct() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
@@ -199,7 +204,7 @@ export function useDeleteProduct() {
 }
 
 export function useUpdateOrderStatus() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -217,7 +222,7 @@ export function useUpdateOrderStatus() {
 }
 
 export function useDeleteOrder() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
@@ -231,7 +236,7 @@ export function useDeleteOrder() {
 }
 
 export function useSetDeliveryTiming() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (timing: string) => {
@@ -245,12 +250,26 @@ export function useSetDeliveryTiming() {
 }
 
 export function useSetDiscount() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (discountText: string) => {
+    mutationFn: async (params: {
+      percentageOff: bigint;
+      percentageMinOrder: bigint;
+      flatOff: bigint;
+      flatMinOrder: bigint;
+      freeItemName: string;
+      freeItemMinOrder: bigint;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.setDiscount(discountText);
+      return actor.setDiscountSettings(
+        params.percentageOff,
+        params.percentageMinOrder,
+        params.flatOff,
+        params.flatMinOrder,
+        params.freeItemName,
+        params.freeItemMinOrder,
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["discount"] });
@@ -259,7 +278,7 @@ export function useSetDiscount() {
 }
 
 export function useSaveProfile() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -276,8 +295,50 @@ export function useSaveProfile() {
   });
 }
 
-/** Parse discount stored as JSON string */
-export function parseDiscount(raw: string): {
+export function useGetCustomSlides() {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<Array<[bigint, string]>>({
+    queryKey: ["customSlides"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getCustomSlides();
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useAddCustomSlide() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (text: string) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.addCustomSlide(text);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customSlides"] });
+    },
+  });
+}
+
+export function useDeleteCustomSlide() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deleteCustomSlide(id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customSlides"] });
+    },
+  });
+}
+
+/** Parse discount from DiscountSettings object into a simple numeric shape */
+export function parseDiscount(raw: DiscountSettings | null | undefined): {
   percentage: number;
   minimumAmount: number;
   flatAmount: number;
@@ -286,28 +347,12 @@ export function parseDiscount(raw: string): {
   freeItemMinimum: number;
 } | null {
   if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      typeof parsed.percentage === "number" &&
-      typeof parsed.minimumAmount === "number"
-    ) {
-      return {
-        percentage: parsed.percentage || 0,
-        minimumAmount: parsed.minimumAmount || 0,
-        flatAmount:
-          typeof parsed.flatAmount === "number" ? parsed.flatAmount : 0,
-        flatMinimum:
-          typeof parsed.flatMinimum === "number" ? parsed.flatMinimum : 0,
-        freeItem: typeof parsed.freeItem === "string" ? parsed.freeItem : "",
-        freeItemMinimum:
-          typeof parsed.freeItemMinimum === "number"
-            ? parsed.freeItemMinimum
-            : 0,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  return {
+    percentage: Number(raw.percentageOff),
+    minimumAmount: Number(raw.percentageMinOrder),
+    flatAmount: Number(raw.flatOff),
+    flatMinimum: Number(raw.flatMinOrder),
+    freeItem: raw.freeItemName,
+    freeItemMinimum: Number(raw.freeItemMinOrder),
+  };
 }

@@ -1,8 +1,8 @@
+import { loadConfig } from "@caffeineai/core-infrastructure";
+import { StorageClient } from "@caffeineai/object-storage";
 import { HttpAgent } from "@icp-sdk/core/agent";
 import type { Identity } from "@icp-sdk/core/agent";
 import { useEffect, useState } from "react";
-import { loadConfig } from "../config";
-import { StorageClient } from "../utils/StorageClient";
 
 export function useStorageClient(identity?: Identity) {
   const [client, setClient] = useState<StorageClient | null>(null);

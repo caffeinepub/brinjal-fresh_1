@@ -1,0 +1,90 @@
+type Product = 
+ record {
+   description: text;
+   id: nat;
+   imageId: text;
+   name: text;
+   price: nat;
+   productCategory: text;
+   stock: nat;
+   unitType: text;
+ };
+type OrderItem = 
+ record {
+   itemTotal: nat;
+   productId: nat;
+   productName: text;
+   quantityLabel: text;
+   unitPrice: nat;
+ };
+type Order = 
+ record {
+   createdAt: int;
+   customerAddress: text;
+   customerName: text;
+   customerPhone: text;
+   discountAmount: nat;
+   discountType: text;
+   freeItem: text;
+   id: nat;
+   items: vec OrderItem;
+   paymentMethod: text;
+   status: text;
+   subtotal: nat;
+   totalAmount: nat;
+ };
+type DiscountSettings = 
+ record {
+   flatMinOrder: nat;
+   flatOff: nat;
+   freeItemMinOrder: nat;
+   freeItemName: text;
+   percentageMinOrder: nat;
+   percentageOff: nat;
+ };
+type CustomerProfile = 
+ record {
+   address: text;
+   name: text;
+   phone: text;
+   updatedAt: int;
+ };
+type AppSettings = 
+ record {
+   heroBannerEnabled: bool;
+   heroBannerHeadline: text;
+ };
+service : {
+  addCustomSlide: ("text": text) -> (nat);
+  addProduct: (name: text, price: nat, stock: nat, imageId: text, unitType:
+   text, productCategory: text, description: text) -> (nat);
+  deleteCustomSlide: (id: nat) -> (bool);
+  deleteOrder: (id: nat) -> (bool);
+  deleteProduct: (id: nat) -> (bool);
+  getAllProfiles: () -> (vec CustomerProfile) query;
+  getAppSettings: () -> (AppSettings) query;
+  getCustomSlides: () -> (vec record {
+                                nat;
+                                text;
+                              }) query;
+  getDeliveryTiming: () -> (text) query;
+  getDiscountSettings: () -> (DiscountSettings) query;
+  getOrders: () -> (vec Order) query;
+  getOrdersByPhone: (phone: text) -> (vec Order) query;
+  getProducts: () -> (vec Product) query;
+  getProfile: (phone: text) -> (opt CustomerProfile) query;
+  placeOrder: (customerName: text, customerPhone: text, customerAddress:
+   text, paymentMethod: text, items: vec OrderItem, subtotal: nat,
+   discountAmount: nat, discountType: text, freeItem: text, totalAmount:
+   nat) -> (nat);
+  saveProfile: (phone: text, name: text, address: text) -> (bool);
+  setAppSettings: (enabled: bool, headline: text) -> (bool);
+  setDeliveryTiming: (timing: text) -> (bool);
+  setDiscountSettings: (percentageOff: nat, percentageMinOrder: nat, flatOff:
+   nat, flatMinOrder: nat, freeItemName: text, freeItemMinOrder: nat) ->
+   (bool);
+  updateOrderStatus: (id: nat, status: text) -> (bool);
+  updateProduct: (id: nat, name: text, price: nat, stock: nat, imageId: 
+   text, unitType: text, productCategory: text, description: text) -> (
+   bool);
+}

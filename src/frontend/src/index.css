@@ -109,4 +109,39 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
+
+  /* Premium gradient overlays for hero banners */
+  .gradient-overlay-dark {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.6),
+      rgba(0, 0, 0, 0.4)
+    );
+  }
+
+  .gradient-overlay-medium {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.5),
+      rgba(0, 0, 0, 0.3)
+    );
+  }
+
+  .gradient-overlay-light {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.1)
+    );
+  }
+
+  /* Smooth slide transition */
+  .transition-slide {
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Hero banner shadow for depth */
+  .shadow-hero {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  }
 }

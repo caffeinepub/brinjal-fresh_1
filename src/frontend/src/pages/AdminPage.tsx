@@ -1,14 +1,25 @@
-import { Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import {
+  Loader2,
+  Lock,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Order, Product } from "../backend";
 import {
   parseDiscount,
+  useAddCustomSlide,
   useAddProduct,
+  useDeleteCustomSlide,
   useDeleteOrder,
   useDeleteProduct,
   useDeliveryTiming,
   useDiscount,
+  useGetCustomSlides,
   useOrders,
   useProducts,
   useProfiles,
@@ -36,6 +47,15 @@ function formatDate(nanos: bigint): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+function formatTime(nanos: bigint): string {
+  const ms = Number(nanos) / 1_000_000;
+  return new Date(ms).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -286,6 +306,7 @@ type AdminTab =
   | "delivery"
   | "discount"
   | "profiles"
+  | "herobanner"
   | "settings";
 
 function ProductsTab() {
@@ -525,9 +546,14 @@ function OrdersTab() {
                         {formatDate(order.createdAt)}
                       </p>
                     </div>
-                    <span className="font-black text-green-700 text-base">
-                      ₹{Number(order.totalAmount) / 100}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className="font-black text-green-700 text-base">
+                        ₹{Number(order.totalAmount) / 100}
+                      </span>
+                      <span className="bg-orange-100 text-orange-700 font-bold text-xs px-2 py-0.5 rounded-lg">
+                        🕐 {formatTime(order.createdAt)}
+                      </span>
+                    </div>
                   </div>
                   <div className="text-xs text-gray-600 mb-1">
                     <span className="font-semibold">{order.customerName}</span>{" "}
@@ -654,7 +680,7 @@ function DeliveryTab() {
 function DiscountTab() {
   const { data: discountRaw } = useDiscount();
   const setDiscountMutation = useSetDiscount();
-  const current = parseDiscount(discountRaw ?? "");
+  const current = parseDiscount(discountRaw ?? null);
 
   const [pct, setPct] = useState(String(current?.percentage ?? ""));
   const [pctMin, setPctMin] = useState(String(current?.minimumAmount ?? ""));
@@ -666,16 +692,17 @@ function DiscountTab() {
   );
 
   const handleSave = async () => {
-    const payload = JSON.stringify({
-      percentage: Number.parseFloat(pct) || 0,
-      minimumAmount: Number.parseFloat(pctMin) || 0,
-      flatAmount: Number.parseFloat(flat) || 0,
-      flatMinimum: Number.parseFloat(flatMin) || 0,
-      freeItem: freeItem.trim(),
-      freeItemMinimum: Number.parseFloat(freeItemMin) || 0,
-    });
     try {
-      await setDiscountMutation.mutateAsync(payload);
+      await setDiscountMutation.mutateAsync({
+        percentageOff: BigInt(Math.round(Number.parseFloat(pct) || 0)),
+        percentageMinOrder: BigInt(Math.round(Number.parseFloat(pctMin) || 0)),
+        flatOff: BigInt(Math.round(Number.parseFloat(flat) || 0)),
+        flatMinOrder: BigInt(Math.round(Number.parseFloat(flatMin) || 0)),
+        freeItemName: freeItem.trim(),
+        freeItemMinOrder: BigInt(
+          Math.round(Number.parseFloat(freeItemMin) || 0),
+        ),
+      });
       toast.success("Discount settings saved!");
     } catch {
       toast.error("Failed to save discount settings");
@@ -836,15 +863,174 @@ function ProfilesTab() {
         <div
           key={p.phone}
           data-ocid={`admin.item.${idx + 1}`}
-          className="bg-white rounded-xl border border-gray-100 shadow-xs p-3"
+          className="bg-white rounded-xl border border-gray-100 shadow-xs p-3 flex items-start gap-3"
         >
-          <p className="font-bold text-gray-800 text-sm">{p.name}</p>
-          <p className="text-gray-500 text-xs">{p.phone}</p>
-          <p className="text-gray-400 text-xs mt-0.5 line-clamp-2">
-            {p.address}
-          </p>
+          <span className="flex-shrink-0 w-7 h-7 rounded-full bg-green-700 text-white text-xs font-black flex items-center justify-center mt-0.5">
+            {idx + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-800 text-sm">{p.name}</p>
+            <p className="text-gray-500 text-xs">{p.phone}</p>
+            <p className="text-gray-400 text-xs mt-0.5 line-clamp-2">
+              {p.address}
+            </p>
+          </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function HeroBannerTab() {
+  const { data: customSlides, isLoading } = useGetCustomSlides();
+  const addSlideMutation = useAddCustomSlide();
+  const deleteSlideMutation = useDeleteCustomSlide();
+  const [slideText, setSlideText] = useState("");
+
+  const BUILTIN_SLIDES = [
+    "🛒 Minimum order up to ₹99",
+    "🚚 Free Delivery on every order",
+    "⏰ Delivery Timing (live from settings)",
+    "🏷️ Active Discount Offer (live from settings)",
+  ];
+
+  const handleAddSlide = async () => {
+    if (!slideText.trim()) {
+      toast.error("Please enter slide text");
+      return;
+    }
+    try {
+      await addSlideMutation.mutateAsync(slideText.trim());
+      toast.success("Slide added!");
+      setSlideText("");
+    } catch {
+      toast.error("Failed to add slide");
+    }
+  };
+
+  const handleDeleteSlide = async (id: bigint) => {
+    if (!confirm("Delete this slide?")) return;
+    try {
+      await deleteSlideMutation.mutateAsync(id);
+      toast.success("Slide deleted");
+    } catch {
+      toast.error("Failed to delete slide");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="bg-gray-50 rounded-xl p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Lock className="w-3.5 h-3.5 text-gray-400" />
+          <h4 className="font-display font-bold text-gray-700 text-sm">
+            Built-in Slides (Cannot be removed)
+          </h4>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {BUILTIN_SLIDES.map((slide) => (
+            <div
+              key={slide}
+              className="bg-white rounded-lg px-3 py-2 flex items-center gap-2 border border-gray-100"
+            >
+              <Lock className="w-3 h-3 text-gray-300 shrink-0" />
+              <span className="text-xs text-gray-600">{slide}</span>
+              <span className="ml-auto text-[10px] text-gray-400 font-semibold bg-gray-100 px-1.5 py-0.5 rounded">
+                Built-in
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-green-50 rounded-xl p-3">
+        <h4 className="font-display font-bold text-gray-700 text-sm mb-3">
+          ✨ Add Custom Slide
+        </h4>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="slide-text">
+            <FieldLabel>Slide Message</FieldLabel>
+          </label>
+          <input
+            id="slide-text"
+            data-ocid="admin.input"
+            className={ic}
+            value={slideText}
+            onChange={(e) => setSlideText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddSlide()}
+            placeholder="e.g. 🎉 Special offer this weekend!"
+          />
+          <button
+            type="button"
+            data-ocid="admin.save_button"
+            onClick={handleAddSlide}
+            disabled={addSlideMutation.isPending}
+            className="w-full bg-green-700 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {addSlideMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" /> Add Slide
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="font-display font-bold text-gray-700 text-sm mb-2">
+          📋 Your Custom Slides
+        </h4>
+        {isLoading ? (
+          <div className="flex flex-col gap-2">
+            {[1, 2].map((k) => (
+              <div
+                key={k}
+                className="h-12 bg-gray-100 rounded-xl animate-pulse"
+              />
+            ))}
+          </div>
+        ) : !customSlides || customSlides.length === 0 ? (
+          <p
+            data-ocid="admin.empty_state"
+            className="text-center text-gray-400 text-sm py-6 bg-gray-50 rounded-xl"
+          >
+            No custom slides yet. Add one above!
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {customSlides.map(([id, text], idx) => (
+              <div
+                key={id.toString()}
+                data-ocid={`admin.item.${idx + 1}`}
+                className="bg-white rounded-xl border border-gray-100 shadow-xs p-3 flex items-center gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-500 mb-0.5">
+                    Slide #{idx + 1}
+                  </p>
+                  <p className="text-sm text-gray-800 font-medium line-clamp-2">
+                    {text}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-ocid={`admin.delete_button.${idx + 1}`}
+                  onClick={() => handleDeleteSlide(id)}
+                  disabled={deleteSlideMutation.isPending}
+                  className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -953,6 +1139,7 @@ export default function AdminPage({ onClose }: { onClose: () => void }) {
     { key: "delivery", label: "Delivery", emoji: "🚚" },
     { key: "discount", label: "Discount", emoji: "🏷️" },
     { key: "profiles", label: "Profiles", emoji: "👥" },
+    { key: "herobanner", label: "Hero Banner", emoji: "🖼️" },
     { key: "settings", label: "Settings", emoji: "⚙️" },
   ];
 
@@ -1004,6 +1191,7 @@ export default function AdminPage({ onClose }: { onClose: () => void }) {
         {activeTab === "delivery" && <DeliveryTab />}
         {activeTab === "discount" && <DiscountTab />}
         {activeTab === "profiles" && <ProfilesTab />}
+        {activeTab === "herobanner" && <HeroBannerTab />}
         {activeTab === "settings" && <SettingsTab />}
       </div>
 

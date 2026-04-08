@@ -1,8 +1,5 @@
 import Map "mo:core/Map";
-import AccessControl "authorization/access-control";
-import MixinStorage "blob-storage/Mixin";
 import Time "mo:core/Time";
-import Principal "mo:core/Principal";
 
 actor {
 
@@ -20,21 +17,26 @@ actor {
   type LegacyOrderNew      = { id : Nat; customerName : Text; customerPhone : Text; customerAddress : Text; paymentMethod : Text; items : [LegacyOrderItemNew]; subtotal : Nat; discountAmount : Nat; totalAmount : Nat; status : Text; createdAt : Int };
   type LegacyProfile       = { phone : Text; name : Text; address : Text; updatedAt : Int };
   type LegacyUserProfile   = { name : Text; phone : Text; address : Text };
+  type LegacyUserRole      = { #admin; #guest; #user };
+  type LegacyACState       = { var adminAssigned : Bool; userRoles : Map.Map<Principal, LegacyUserRole> };
 
   // ── Legacy stable bindings — names must match previous actor exactly ──────────
-  // accessControlState was created by AccessControl.initState() in old actor
-  let accessControlState = AccessControl.initState();
-
   // Old plain stable vars
-  stable var discountPercentage  : Nat  = 0;
-  stable var discountMinimum     : Nat  = 0;
-  stable var discount            : Text = "";
-  stable var nextFeedbackId      : Nat  = 1;
-  stable var discountText        : Text = "";
-  stable var bannerEnabled       : Bool = true;
-  stable var trustBadgesEnabled  : Bool = true;
-  stable var bannerCustomText    : Text = "Fresh Vegetables Daily";
-  stable var minimumOrder        : Nat  = 0;
+  var discountPercentage  : Nat  = 0;
+  var discountMinimum     : Nat  = 0;
+  var discount            : Text = "";
+  var nextFeedbackId      : Nat  = 1;
+  var discountText        : Text = "";
+  var bannerEnabled       : Bool = true;
+  var trustBadgesEnabled  : Bool = true;
+  var bannerCustomText    : Text = "Fresh Vegetables Daily";
+  var minimumOrder        : Nat  = 0;
+
+  // Legacy accessControlState — must be present to allow upgrade from previous version
+  let accessControlState : LegacyACState = {
+    var adminAssigned = false;
+    userRoles = Map.empty<Principal, LegacyUserRole>();
+  };
 
   // Old Map-based stores (names must match exactly)
   let storeProducts  = Map.empty<Nat, LegacyStoreProduct>();
@@ -105,24 +107,26 @@ actor {
   };
 
   // ── Current stable state ────────────────────────────────────────────────
-  stable var nextProductId : Nat  = 1;
-  stable var nextOrderId   : Nat  = 1;
-  stable var deliveryTiming : Text = "10am - 6pm";
-  stable var heroBannerEnabled  : Bool = true;
-  stable var heroBannerHeadline : Text = "Fresh Vegetables Daily";
+  var nextProductId : Nat  = 1;
+  var nextOrderId   : Nat  = 1;
+  var deliveryTiming : Text = "10am - 6pm";
+  var heroBannerEnabled  : Bool = true;
+  var heroBannerHeadline : Text = "Fresh Vegetables Daily";
 
-  stable var discountPercentageOff      : Nat  = 0;
-  stable var discountPercentageMinOrder : Nat  = 0;
-  stable var discountFlatOff            : Nat  = 0;
-  stable var discountFlatMinOrder       : Nat  = 0;
-  stable var discountFreeItemName       : Text = "";
-  stable var discountFreeItemMinOrder   : Nat  = 0;
+  var discountPercentageOff      : Nat  = 0;
+  var discountPercentageMinOrder : Nat  = 0;
+  var discountFlatOff            : Nat  = 0;
+  var discountFlatMinOrder       : Nat  = 0;
+  var discountFreeItemName       : Text = "";
+  var discountFreeItemMinOrder   : Nat  = 0;
 
   let productsMap = Map.empty<Nat, Product>();
   let ordersMap   = Map.empty<Nat, Order>();
   let profilesMap = Map.empty<Text, CustomerProfile>();
 
-  include MixinStorage();
+  // ── Custom Hero Banner Slides ───────────────────────────────────────────
+  var nextSlideId : Nat = 1;
+  let customSlidesMap = Map.empty<Nat, Text>();
 
   // ── Products ──────────────────────────────────────────────────────────
 
@@ -319,6 +323,29 @@ actor {
     heroBannerEnabled  := enabled;
     heroBannerHeadline := headline;
     true;
+  };
+
+  // ── Custom Hero Banner Slides ─────────────────────────────────────────────
+
+  public shared func addCustomSlide(text : Text) : async Nat {
+    let id = nextSlideId;
+    customSlidesMap.add(id, text);
+    nextSlideId += 1;
+    id;
+  };
+
+  public shared func deleteCustomSlide(id : Nat) : async Bool {
+    switch (customSlidesMap.get(id)) {
+      case (null) { false };
+      case (?_) {
+        customSlidesMap.remove(id);
+        true;
+      };
+    };
+  };
+
+  public query func getCustomSlides() : async [(Nat, Text)] {
+    customSlidesMap.entries().toArray();
   };
 
 };

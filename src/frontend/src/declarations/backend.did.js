@@ -8,26 +8,23 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const _CaffeineStorageCreateCertificateResult = IDL.Record({
-  'method' : IDL.Text,
-  'blob_hash' : IDL.Text,
-});
-export const _CaffeineStorageRefillInformation = IDL.Record({
-  'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
-});
-export const _CaffeineStorageRefillResult = IDL.Record({
-  'success' : IDL.Opt(IDL.Bool),
-  'topped_up_amount' : IDL.Opt(IDL.Nat),
-});
-export const UserRole = IDL.Variant({
-  'admin' : IDL.Null,
-  'user' : IDL.Null,
-  'guest' : IDL.Null,
-});
-export const UserProfile = IDL.Record({
+export const CustomerProfile = IDL.Record({
   'name' : IDL.Text,
+  'updatedAt' : IDL.Int,
   'address' : IDL.Text,
   'phone' : IDL.Text,
+});
+export const AppSettings = IDL.Record({
+  'heroBannerEnabled' : IDL.Bool,
+  'heroBannerHeadline' : IDL.Text,
+});
+export const DiscountSettings = IDL.Record({
+  'flatMinOrder' : IDL.Nat,
+  'percentageMinOrder' : IDL.Nat,
+  'freeItemName' : IDL.Text,
+  'percentageOff' : IDL.Nat,
+  'freeItemMinOrder' : IDL.Nat,
+  'flatOff' : IDL.Nat,
 });
 export const OrderItem = IDL.Record({
   'itemTotal' : IDL.Nat,
@@ -40,10 +37,12 @@ export const Order = IDL.Record({
   'id' : IDL.Nat,
   'customerName' : IDL.Text,
   'status' : IDL.Text,
+  'freeItem' : IDL.Text,
   'paymentMethod' : IDL.Text,
   'customerPhone' : IDL.Text,
   'discountAmount' : IDL.Nat,
   'createdAt' : IDL.Int,
+  'discountType' : IDL.Text,
   'customerAddress' : IDL.Text,
   'totalAmount' : IDL.Nat,
   'items' : IDL.Vec(OrderItem),
@@ -59,64 +58,30 @@ export const Product = IDL.Record({
   'imageId' : IDL.Text,
   'price' : IDL.Nat,
 });
-export const CustomerProfile = IDL.Record({
-  'name' : IDL.Text,
-  'updatedAt' : IDL.Int,
-  'address' : IDL.Text,
-  'phone' : IDL.Text,
-});
 
 export const idlService = IDL.Service({
-  '_caffeineStorageBlobIsLive' : IDL.Func(
-      [IDL.Vec(IDL.Nat8)],
-      [IDL.Bool],
-      ['query'],
-    ),
-  '_caffeineStorageBlobsToDelete' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Vec(IDL.Nat8))],
-      ['query'],
-    ),
-  '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
-      [IDL.Vec(IDL.Vec(IDL.Nat8))],
-      [],
-      [],
-    ),
-  '_caffeineStorageCreateCertificate' : IDL.Func(
-      [IDL.Text],
-      [_CaffeineStorageCreateCertificateResult],
-      [],
-    ),
-  '_caffeineStorageRefillCashier' : IDL.Func(
-      [IDL.Opt(_CaffeineStorageRefillInformation)],
-      [_CaffeineStorageRefillResult],
-      [],
-    ),
-  '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addCustomSlide' : IDL.Func([IDL.Text], [IDL.Nat], []),
   'addProduct' : IDL.Func(
       [IDL.Text, IDL.Nat, IDL.Nat, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
       [IDL.Nat],
       [],
     ),
-  'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-  'deleteOrder' : IDL.Func([IDL.Nat], [], []),
-  'deleteProduct' : IDL.Func([IDL.Nat], [], []),
-  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-  'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getDeliveryTiming' : IDL.Func([], [IDL.Text], ['query']),
-  'getDiscount' : IDL.Func([], [IDL.Text], ['query']),
-  'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'getOrdersByPhone' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
-  'getProduct' : IDL.Func([IDL.Nat], [Product], ['query']),
-  'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
-  'getProfiles' : IDL.Func([], [IDL.Vec(CustomerProfile)], ['query']),
-  'getUserProfile' : IDL.Func(
-      [IDL.Principal],
-      [IDL.Opt(UserProfile)],
+  'deleteCustomSlide' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'deleteOrder' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'deleteProduct' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'getAllProfiles' : IDL.Func([], [IDL.Vec(CustomerProfile)], ['query']),
+  'getAppSettings' : IDL.Func([], [AppSettings], ['query']),
+  'getCustomSlides' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
       ['query'],
     ),
-  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'getDeliveryTiming' : IDL.Func([], [IDL.Text], ['query']),
+  'getDiscountSettings' : IDL.Func([], [DiscountSettings], ['query']),
+  'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getOrdersByPhone' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
+  'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+  'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(CustomerProfile)], ['query']),
   'placeOrder' : IDL.Func(
       [
         IDL.Text,
@@ -126,16 +91,22 @@ export const idlService = IDL.Service({
         IDL.Vec(OrderItem),
         IDL.Nat,
         IDL.Nat,
+        IDL.Text,
+        IDL.Text,
         IDL.Nat,
       ],
       [IDL.Nat],
       [],
     ),
-  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'saveProfile' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-  'setDeliveryTiming' : IDL.Func([IDL.Text], [], []),
-  'setDiscount' : IDL.Func([IDL.Text], [], []),
-  'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'saveProfile' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+  'setAppSettings' : IDL.Func([IDL.Bool, IDL.Text], [IDL.Bool], []),
+  'setDeliveryTiming' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'setDiscountSettings' : IDL.Func(
+      [IDL.Nat, IDL.Nat, IDL.Nat, IDL.Nat, IDL.Text, IDL.Nat],
+      [IDL.Bool],
+      [],
+    ),
+  'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
   'updateProduct' : IDL.Func(
       [
         IDL.Nat,
@@ -147,7 +118,7 @@ export const idlService = IDL.Service({
         IDL.Text,
         IDL.Text,
       ],
-      [],
+      [IDL.Bool],
       [],
     ),
 });
@@ -155,26 +126,23 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const _CaffeineStorageCreateCertificateResult = IDL.Record({
-    'method' : IDL.Text,
-    'blob_hash' : IDL.Text,
-  });
-  const _CaffeineStorageRefillInformation = IDL.Record({
-    'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
-  });
-  const _CaffeineStorageRefillResult = IDL.Record({
-    'success' : IDL.Opt(IDL.Bool),
-    'topped_up_amount' : IDL.Opt(IDL.Nat),
-  });
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'user' : IDL.Null,
-    'guest' : IDL.Null,
-  });
-  const UserProfile = IDL.Record({
+  const CustomerProfile = IDL.Record({
     'name' : IDL.Text,
+    'updatedAt' : IDL.Int,
     'address' : IDL.Text,
     'phone' : IDL.Text,
+  });
+  const AppSettings = IDL.Record({
+    'heroBannerEnabled' : IDL.Bool,
+    'heroBannerHeadline' : IDL.Text,
+  });
+  const DiscountSettings = IDL.Record({
+    'flatMinOrder' : IDL.Nat,
+    'percentageMinOrder' : IDL.Nat,
+    'freeItemName' : IDL.Text,
+    'percentageOff' : IDL.Nat,
+    'freeItemMinOrder' : IDL.Nat,
+    'flatOff' : IDL.Nat,
   });
   const OrderItem = IDL.Record({
     'itemTotal' : IDL.Nat,
@@ -187,10 +155,12 @@ export const idlFactory = ({ IDL }) => {
     'id' : IDL.Nat,
     'customerName' : IDL.Text,
     'status' : IDL.Text,
+    'freeItem' : IDL.Text,
     'paymentMethod' : IDL.Text,
     'customerPhone' : IDL.Text,
     'discountAmount' : IDL.Nat,
     'createdAt' : IDL.Int,
+    'discountType' : IDL.Text,
     'customerAddress' : IDL.Text,
     'totalAmount' : IDL.Nat,
     'items' : IDL.Vec(OrderItem),
@@ -206,64 +176,30 @@ export const idlFactory = ({ IDL }) => {
     'imageId' : IDL.Text,
     'price' : IDL.Nat,
   });
-  const CustomerProfile = IDL.Record({
-    'name' : IDL.Text,
-    'updatedAt' : IDL.Int,
-    'address' : IDL.Text,
-    'phone' : IDL.Text,
-  });
   
   return IDL.Service({
-    '_caffeineStorageBlobIsLive' : IDL.Func(
-        [IDL.Vec(IDL.Nat8)],
-        [IDL.Bool],
-        ['query'],
-      ),
-    '_caffeineStorageBlobsToDelete' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Vec(IDL.Nat8))],
-        ['query'],
-      ),
-    '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
-        [IDL.Vec(IDL.Vec(IDL.Nat8))],
-        [],
-        [],
-      ),
-    '_caffeineStorageCreateCertificate' : IDL.Func(
-        [IDL.Text],
-        [_CaffeineStorageCreateCertificateResult],
-        [],
-      ),
-    '_caffeineStorageRefillCashier' : IDL.Func(
-        [IDL.Opt(_CaffeineStorageRefillInformation)],
-        [_CaffeineStorageRefillResult],
-        [],
-      ),
-    '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addCustomSlide' : IDL.Func([IDL.Text], [IDL.Nat], []),
     'addProduct' : IDL.Func(
         [IDL.Text, IDL.Nat, IDL.Nat, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [IDL.Nat],
         [],
       ),
-    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'deleteOrder' : IDL.Func([IDL.Nat], [], []),
-    'deleteProduct' : IDL.Func([IDL.Nat], [], []),
-    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-    'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getDeliveryTiming' : IDL.Func([], [IDL.Text], ['query']),
-    'getDiscount' : IDL.Func([], [IDL.Text], ['query']),
-    'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'getOrdersByPhone' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
-    'getProduct' : IDL.Func([IDL.Nat], [Product], ['query']),
-    'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
-    'getProfiles' : IDL.Func([], [IDL.Vec(CustomerProfile)], ['query']),
-    'getUserProfile' : IDL.Func(
-        [IDL.Principal],
-        [IDL.Opt(UserProfile)],
+    'deleteCustomSlide' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'deleteOrder' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'deleteProduct' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'getAllProfiles' : IDL.Func([], [IDL.Vec(CustomerProfile)], ['query']),
+    'getAppSettings' : IDL.Func([], [AppSettings], ['query']),
+    'getCustomSlides' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
         ['query'],
       ),
-    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'getDeliveryTiming' : IDL.Func([], [IDL.Text], ['query']),
+    'getDiscountSettings' : IDL.Func([], [DiscountSettings], ['query']),
+    'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getOrdersByPhone' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
+    'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+    'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(CustomerProfile)], ['query']),
     'placeOrder' : IDL.Func(
         [
           IDL.Text,
@@ -273,16 +209,22 @@ export const idlFactory = ({ IDL }) => {
           IDL.Vec(OrderItem),
           IDL.Nat,
           IDL.Nat,
+          IDL.Text,
+          IDL.Text,
           IDL.Nat,
         ],
         [IDL.Nat],
         [],
       ),
-    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'saveProfile' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-    'setDeliveryTiming' : IDL.Func([IDL.Text], [], []),
-    'setDiscount' : IDL.Func([IDL.Text], [], []),
-    'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+    'saveProfile' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+    'setAppSettings' : IDL.Func([IDL.Bool, IDL.Text], [IDL.Bool], []),
+    'setDeliveryTiming' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'setDiscountSettings' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Nat, IDL.Nat, IDL.Text, IDL.Nat],
+        [IDL.Bool],
+        [],
+      ),
+    'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
     'updateProduct' : IDL.Func(
         [
           IDL.Nat,
@@ -294,7 +236,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Text,
           IDL.Text,
         ],
-        [],
+        [IDL.Bool],
         [],
       ),
   });

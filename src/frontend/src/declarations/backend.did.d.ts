@@ -10,20 +10,34 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface AppSettings {
+  'heroBannerEnabled' : boolean,
+  'heroBannerHeadline' : string,
+}
 export interface CustomerProfile {
   'name' : string,
   'updatedAt' : bigint,
   'address' : string,
   'phone' : string,
 }
+export interface DiscountSettings {
+  'flatMinOrder' : bigint,
+  'percentageMinOrder' : bigint,
+  'freeItemName' : string,
+  'percentageOff' : bigint,
+  'freeItemMinOrder' : bigint,
+  'flatOff' : bigint,
+}
 export interface Order {
   'id' : bigint,
   'customerName' : string,
   'status' : string,
+  'freeItem' : string,
   'paymentMethod' : string,
   'customerPhone' : string,
   'discountAmount' : bigint,
   'createdAt' : bigint,
+  'discountType' : string,
   'customerAddress' : string,
   'totalAmount' : bigint,
   'items' : Array<OrderItem>,
@@ -46,72 +60,50 @@ export interface Product {
   'imageId' : string,
   'price' : bigint,
 }
-export interface UserProfile {
-  'name' : string,
-  'address' : string,
-  'phone' : string,
-}
-export type UserRole = { 'admin' : null } |
-  { 'user' : null } |
-  { 'guest' : null };
-export interface _CaffeineStorageCreateCertificateResult {
-  'method' : string,
-  'blob_hash' : string,
-}
-export interface _CaffeineStorageRefillInformation {
-  'proposed_top_up_amount' : [] | [bigint],
-}
-export interface _CaffeineStorageRefillResult {
-  'success' : [] | [boolean],
-  'topped_up_amount' : [] | [bigint],
-}
 export interface _SERVICE {
-  '_caffeineStorageBlobIsLive' : ActorMethod<[Uint8Array], boolean>,
-  '_caffeineStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
-  '_caffeineStorageConfirmBlobDeletion' : ActorMethod<
-    [Array<Uint8Array>],
-    undefined
-  >,
-  '_caffeineStorageCreateCertificate' : ActorMethod<
-    [string],
-    _CaffeineStorageCreateCertificateResult
-  >,
-  '_caffeineStorageRefillCashier' : ActorMethod<
-    [[] | [_CaffeineStorageRefillInformation]],
-    _CaffeineStorageRefillResult
-  >,
-  '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addCustomSlide' : ActorMethod<[string], bigint>,
   'addProduct' : ActorMethod<
     [string, bigint, bigint, string, string, string, string],
     bigint
   >,
-  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'deleteOrder' : ActorMethod<[bigint], undefined>,
-  'deleteProduct' : ActorMethod<[bigint], undefined>,
-  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'deleteCustomSlide' : ActorMethod<[bigint], boolean>,
+  'deleteOrder' : ActorMethod<[bigint], boolean>,
+  'deleteProduct' : ActorMethod<[bigint], boolean>,
+  'getAllProfiles' : ActorMethod<[], Array<CustomerProfile>>,
+  'getAppSettings' : ActorMethod<[], AppSettings>,
+  'getCustomSlides' : ActorMethod<[], Array<[bigint, string]>>,
   'getDeliveryTiming' : ActorMethod<[], string>,
-  'getDiscount' : ActorMethod<[], string>,
+  'getDiscountSettings' : ActorMethod<[], DiscountSettings>,
   'getOrders' : ActorMethod<[], Array<Order>>,
   'getOrdersByPhone' : ActorMethod<[string], Array<Order>>,
-  'getProduct' : ActorMethod<[bigint], Product>,
   'getProducts' : ActorMethod<[], Array<Product>>,
-  'getProfiles' : ActorMethod<[], Array<CustomerProfile>>,
-  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
-  'isCallerAdmin' : ActorMethod<[], boolean>,
+  'getProfile' : ActorMethod<[string], [] | [CustomerProfile]>,
   'placeOrder' : ActorMethod<
-    [string, string, string, string, Array<OrderItem>, bigint, bigint, bigint],
+    [
+      string,
+      string,
+      string,
+      string,
+      Array<OrderItem>,
+      bigint,
+      bigint,
+      string,
+      string,
+      bigint,
+    ],
     bigint
   >,
-  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'saveProfile' : ActorMethod<[string, string, string], undefined>,
-  'setDeliveryTiming' : ActorMethod<[string], undefined>,
-  'setDiscount' : ActorMethod<[string], undefined>,
-  'updateOrderStatus' : ActorMethod<[bigint, string], undefined>,
+  'saveProfile' : ActorMethod<[string, string, string], boolean>,
+  'setAppSettings' : ActorMethod<[boolean, string], boolean>,
+  'setDeliveryTiming' : ActorMethod<[string], boolean>,
+  'setDiscountSettings' : ActorMethod<
+    [bigint, bigint, bigint, bigint, string, bigint],
+    boolean
+  >,
+  'updateOrderStatus' : ActorMethod<[bigint, string], boolean>,
   'updateProduct' : ActorMethod<
     [bigint, string, bigint, bigint, string, string, string, string],
-    undefined
+    boolean
   >,
 }
 export declare const idlService: IDL.ServiceClass;

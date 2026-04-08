@@ -1,0 +1,26 @@
+{
+  "overview": "Brinjal Fresh Store is a customer-facing PWA for ordering fresh vegetables and fruits. Customers browse products, select quantities, and place orders with Cash on Delivery. The admin panel (hidden, password-protected) manages products, orders, discounts, delivery timing, and customer profiles.",
+  "features": [
+    "Hero banner with full-background vegetable images and premium Zepto/Blinkit-style styling",
+    "Rotating slides: Min order, Free Delivery, Delivery Timing, Discount, custom slides",
+    "Admin can add/remove custom hero banner slides",
+    "Customer profiles displayed in numbered sequence in admin panel",
+    "Order timestamps shown in admin Orders tab for easy delivery scheduling",
+    "Product rows grouped by category (Vegetables, Leafy, Combo, Fruits) - horizontally scrollable",
+    "Cart with auto-applied discounts (percentage, flat amount, free item on order)",
+    "Anonymous checkout - name, phone, address only",
+    "PWA with custom Brinjal Fresh logo",
+    "Admin panel: Products, Orders, Delivery, Discount, Profiles, Settings, Hero Banner tabs"
+  ],
+  "category": "e-commerce",
+  "tags": [
+    "vegetables",
+    "grocery",
+    "delivery",
+    "pwa",
+    "ecommerce",
+    "admin-panel",
+    "india"
+  ],
+  "last_updated": "2026-04-08T02:31:45.544Z"
+}

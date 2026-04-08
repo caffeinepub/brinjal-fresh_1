@@ -1,6 +1,7 @@
 import { Loader2, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ProductImage } from "../components/ProductCard";
 import {
   buildQuantityLabel,
   getOptionPrice,
@@ -19,7 +20,7 @@ export default function KartPage() {
   const { items, removeFromKart, updateQuantity, clearKart, totalAmount } =
     useKart();
   const { data: discountRaw } = useDiscount();
-  const discount = parseDiscount(discountRaw ?? "");
+  const discount = parseDiscount(discountRaw ?? null);
   const placeOrderMutation = usePlaceOrder();
   const saveProfileMutation = useSaveProfile();
 
@@ -108,6 +109,8 @@ export default function KartPage() {
         items: orderItems,
         subtotal: BigInt(Math.round(subtotal * 100)),
         discountAmount: BigInt(Math.round(discountAmount * 100)),
+        discountType: discountLabel,
+        freeItem: freeItemMessage,
         totalAmount: BigInt(Math.round(total * 100)),
       });
 
@@ -202,8 +205,11 @@ export default function KartPage() {
               data-ocid={`cart.item.${idx + 1}`}
               className="bg-white rounded-2xl shadow-card border border-gray-100 p-3 flex items-start gap-3"
             >
-              <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center overflow-hidden shrink-0">
-                <span className="text-2xl">🥦</span>
+              <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                <ProductImage
+                  imageId={item.product.imageId}
+                  className="w-full h-full rounded-xl"
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-gray-800 text-sm line-clamp-1">
